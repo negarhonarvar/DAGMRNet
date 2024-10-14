@@ -190,10 +190,10 @@ class CmrxReconSliceDataset(torch.utils.data.Dataset):
         )
         self.raw_samples = []
         # not used
-        if raw_sample_filter is None:
-            self.raw_sample_filter = lambda raw_sample: True
-        else:
-            self.raw_sample_filter = raw_sample_filter
+        # if raw_sample_filter is None:
+        #     self.raw_sample_filter = lambda raw_sample: True
+        # else:
+        #     self.raw_sample_filter = raw_sample_filter
 
         # set default sampling mode if none given
         if sample_rate is None:

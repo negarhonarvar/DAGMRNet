@@ -44,7 +44,7 @@ def cli_main(args):
         test_path=args.test_path,
         sample_rate=args.sample_rate,
         batch_size=args.batch_size,
-        num_workers=args.num_workers,
+        num_workers=12 ,    # args.num_workers,
         distributed_sampler=(args.strategy in (
             "ddp_find_unused_parameters_false", "ddp", "ddp_cpu")),
     )
@@ -201,7 +201,7 @@ def build_args():
         seed=42,  # random seed
         deterministic=False,  # makes things slower, but deterministic
         # default_root_dir=default_root_dir,  # directory for logs and checkpoints
-        max_epochs=1,  # max number of epochs , used to be 12
+        max_epochs=7,  # max number of epochs , used to be 12
         gradient_clip_val=0.01
     )
 
