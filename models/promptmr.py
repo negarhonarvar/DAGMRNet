@@ -4,7 +4,8 @@ Affiliation: Computer Science department, Rutgers University, NJ, USA
 Paper: https://arxiv.org/abs/2309.13839
 Date: 2023-10-15
 '''
-import models.DAGL as DAGL
+from ast import Dict
+from models.DAGL import RR
 import torch
 import torch.nn as nn
 import fastmri
@@ -264,55 +265,31 @@ class NormPromptUnet(nn.Module):
         n_bottleneck_cab: int = 3,
         no_use_ca: bool = False,
         learnable_input_prompt=False,
-        # DAGL-specific arguments
-        scale: List[int] = [2],              # upscale factor for DAGL model
-        n_resblocks: int = 16,               # number of residual blocks in DAGL
-        n_feats: int = 64,                   # number of feature channels in DAGL
-        rgb_range: int = 255,                # RGB range for DAGL
-        res_scale: float = 1.0,              # Residual scale factor in DAGL
-        chop: bool = False,                  # Forward chop (memory management)
-        self_ensemble: bool = False,         # Self-ensemble for DAGL
-        precision: str = 'single',           # Precision (half/single)
-        cpu: bool = False,                   # Use CPU (False = GPU)
-        n_GPUs: int = 1,                     # Number of GPUs
-        save_models: bool = False,           # Save model checkpoints
-        pre_train: str = '',                 # Pretrained model path
-        resume: int = -1,                    # Resume from checkpoint (-1 = latest)
-        seed: int = 123,                     # Random seed for reproducibility
-        print_model: bool = False,           # Print model architecture
+        dagl_config :Dict = None,  # DAGL specific configuration
     ):
 
         super().__init__()
-        self.unet = PromptUnet(in_chans=in_chans,
-                                out_chans = out_chans, 
-                                n_feat0=n_feat0,
-                                feature_dim = feature_dim,
-                                prompt_dim = prompt_dim,
-                                len_prompt = len_prompt,
-                                prompt_size = prompt_size,
-                                n_enc_cab = n_enc_cab,
-                                n_dec_cab = n_dec_cab,
-                                n_skip_cab = n_skip_cab,
-                                n_bottleneck_cab = n_bottleneck_cab,
-                                no_use_ca = no_use_ca,
-                                learnable_input_prompt=learnable_input_prompt,
-                                )
-        self.dagl_model =DAGL.RR(scale=scale,
-                                n_resblocks=n_resblocks,
-                                n_feats=n_feats,
-                                rgb_range=rgb_range,
-                                res_scale=res_scale,
-                                chop=chop,
-                                self_ensemble=self_ensemble,
-                                precision=precision,
-                                cpu=cpu,
-                                n_GPUs=n_GPUs,
-                                save_models=save_models,
-                                pre_train=pre_train,
-                                resume=resume,
-                                seed=seed,
-                                print_model=print_model
-                                )
+        # Assuming DAGL requires in_chans and out_chans parameters
+        if dagl_config is None:
+            # Ensure dagl_config is not None by setting a default configuration
+            dagl_config = {
+                'scale': 2,
+                'n_resblocks': 2, # 32
+                'n_feats': 4, # 64
+                'rgb_range': 255,
+                'res_scale': 1.0,
+                'chop': True,
+                'self_ensemble': False,
+                'cpu': False,
+                'n_GPUs': 1,
+                'save_models': False,
+                'pre_train': '',
+                'resume': 0,
+                'seed': 42,
+                'print_model': False,
+            }
+
+        self.dagl_model = RR(dagl_config)
 
     def complex_to_chan_dim(self, x: torch.Tensor) -> torch.Tensor:  # combines complex numbers
         b, c, h, w, two = x.shape
@@ -377,14 +354,17 @@ class NormPromptUnet(nn.Module):
         print(x.shape)
         print(x.type)
         print("*************************************************")
-        x = self.unet(x)
-        
-        # get shapes back and unnormalize
-        x = self.unpad(x, *pad_sizes)
-        x = self.unnorm(x, mean, std)
-        x = self.chan_complex_to_last_dim(x)
+        undersampled_image = x[:, 0, :, :].unsqueeze(1)  # Extract undersampled image, add a channel dimension
 
-        return x
+        # Pass the undersampled image to the DAGL model
+        output = self.dagl_model(undersampled_image)
+        print(f"Output shape of dagl_model: {output.shape}")
+        # get shapes back and unnormalize
+        output = self.unpad(output, *pad_sizes)
+        output = self.unnorm(output, mean, std)
+        output = self.chan_complex_to_last_dim(output)
+
+        return output
 
 
 class PromptMRBlock(nn.Module):
@@ -610,6 +590,7 @@ class PromptMR(nn.Module):
         mask_center: bool = True,
         use_checkpoint: bool = False,
         low_mem: bool = False,
+        dagl_config : Dict = None,
     ):
         """
         Args:
@@ -658,7 +639,13 @@ class PromptMR(nn.Module):
 
         )
         self.cascades = nn.ModuleList(
-            [PromptMRBlock(NormPromptUnet(2*num_adj_slices, 2*num_adj_slices, n_feat0, feature_dim, prompt_dim, len_prompt, prompt_size, n_enc_cab, n_dec_cab, n_skip_cab, n_bottleneck_cab, no_use_ca), num_adj_slices) for _ in range(num_cascades)]
+            [PromptMRBlock
+             (NormPromptUnet
+                (2*num_adj_slices, 2*num_adj_slices, n_feat0, feature_dim, 
+                 prompt_dim, len_prompt, prompt_size, n_enc_cab, n_dec_cab, n_skip_cab,
+                   n_bottleneck_cab, no_use_ca,dagl_config), 
+                   num_adj_slices) 
+                   for _ in range(num_cascades)]
         )
         self.use_checkpoint = use_checkpoint
 
@@ -668,13 +655,14 @@ class PromptMR(nn.Module):
         mask: torch.Tensor,
         num_low_frequencies: Optional[int] = None,
     ) -> torch.Tensor:
-
+        # sensitivity map estimation
         if self.use_checkpoint and self.training:
             sens_maps = torch.utils.checkpoint.checkpoint(
                 self.sens_net, masked_kspace, mask, num_low_frequencies, use_reentrant=False)
         else:
             sens_maps = self.sens_net(masked_kspace, mask, num_low_frequencies)
         kspace_pred = masked_kspace.clone()
+        # Running through cascades
         for cascade in self.cascades:
             if self.use_checkpoint and self.training:
                 kspace_pred = torch.utils.checkpoint.checkpoint(
@@ -682,9 +670,10 @@ class PromptMR(nn.Module):
             else:
                 kspace_pred = cascade(kspace_pred, masked_kspace, mask, sens_maps)
 
+        # Extract the center slice after reconstruction
         kspace_pred = torch.chunk(kspace_pred, self.num_adj_slices, dim=1)[
             self.center_slice]
-
+        # Final image reconstruction using inverse FFT and RSS
         return fastmri.rss(fastmri.complex_abs(fastmri.ifft2c(kspace_pred)), dim=1)
 
 
