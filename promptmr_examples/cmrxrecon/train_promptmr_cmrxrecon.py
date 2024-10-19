@@ -19,7 +19,9 @@ os.environ["RANK"] = "0"
 
 def cli_main(args):
     pl.seed_everything(args.seed)
-
+    checkpoint_dir = 'D:/Paper/codes/PromptMR/promptmr_examples/cmrxrecon/checkpoints/'  # Specify the path to save model checkpoints 
+    pre_trained_model = 'D:/Paper/codes/PromptMR/promptmr_examples/cmrxrecon/pretrained/model.pt'  # Specify path to pre-trained model if any
+    
     # ------------
     # data
     # ------------
@@ -48,7 +50,22 @@ def cli_main(args):
         distributed_sampler=(args.strategy in (
             "ddp_find_unused_parameters_false", "ddp", "ddp_cpu")),
     )
-
+    # Define DAGL configuration
+    dagl_config = {
+        'scale': args.scale,
+        'n_resblocks': args.n_resblocks,
+        'n_feats': args.n_feats,
+        'rgb_range': args.rgb_range,
+        'res_scale': args.res_scale,
+        'chop': args.chop,
+        'self_ensemble': args.self_ensemble,
+        'cpu': args.cpu,
+        'n_GPUs': args.n_GPUs,
+        'save_models': args.save_models,
+        'pre_train': args.pre_train,
+        'resume': args.resume,
+        'seed': args.seed,
+    }
     # ------------
     # model
     # ------------
@@ -78,6 +95,7 @@ def cli_main(args):
 
         use_checkpoint=args.use_checkpoint,
         low_mem=args.low_mem,
+        dagl_config= dagl_config,
     )
 
     # ------------
@@ -153,7 +171,81 @@ def build_args():
         type=int,
         help="Acceleration rates to use for masks",
     )
-
+    # DAGl model args
+    parser.add_argument(
+        '--scale', 
+        type=int, 
+        default=2, 
+        help='Scaling factor for DAGL'
+    )
+    parser.add_argument(
+        '--n_resblocks', 
+        type=int, 
+        default=2,  # 32
+        help='Number of residual blocks in DAGL'
+    )
+    parser.add_argument(
+        '--n_feats', 
+        type=int, 
+        default=4,  # 64
+        help='Number of feature maps in DAGL'
+    )
+    parser.add_argument(
+        '--rgb_range', 
+        type=int, 
+        default=255, 
+        help='Range for pixel values'
+    )
+    parser.add_argument(
+        '--res_scale', 
+        type=float, 
+        default=1.0, 
+        help='Residual scaling factor'
+    )
+    parser.add_argument(
+        '--chop', 
+        action='store_true', 
+        help='Use memory-efficient forward pass'
+    )
+    parser.add_argument(
+        '--self_ensemble', 
+        action='store_true', 
+        help='Use self-ensemble method'
+    )
+    parser.add_argument(
+        '--cpu', 
+        action='store_true', 
+        help='Use CPU instead of GPU'
+    )
+    parser.add_argument(
+        '--n_GPUs', 
+        type=int, 
+        default=1, 
+        help='Number of GPUs to use'
+    )
+    parser.add_argument(
+        '--save_models', 
+        action='store_true', 
+        help='Save models during training'
+    )
+    parser.add_argument(
+        '--pre_train',
+        type=str, 
+        default='', 
+        help='Path to pre-trained model'
+    )
+    parser.add_argument(
+        '--resume', 
+        type=int,
+        default=0, 
+        help='Resume training from checkpoint'
+    )
+    parser.add_argument(
+        '--seed', 
+        type=int, 
+        default=42, 
+        help='Random seed'
+    )
     # data config with path to fastMRI data and batch size
     parser = CmrxReconDataModule.add_data_specific_args(parser)
     parser.set_defaults(
@@ -201,7 +293,7 @@ def build_args():
         seed=42,  # random seed
         deterministic=False,  # makes things slower, but deterministic
         # default_root_dir=default_root_dir,  # directory for logs and checkpoints
-        max_epochs=7,  # max number of epochs , used to be 12
+        max_epochs=1,  # max number of epochs , used to be 12
         gradient_clip_val=0.01
     )
 
@@ -223,12 +315,12 @@ def build_args():
             mode="min",
         )
     ]
-
+    args.resume_from_checkpoint = None
     # set default checkpoint if one exists in our checkpoint directory
-    if args.resume_from_checkpoint is None:
-        ckpt_list = sorted(checkpoint_dir.glob("*.ckpt"), key=os.path.getmtime)
-        if ckpt_list:
-            args.resume_from_checkpoint = str(ckpt_list[-1])
+    # if args.resume_from_checkpoint is None:
+    #     ckpt_list = sorted(checkpoint_dir.glob("*.ckpt"), key=os.path.getmtime)
+    #     if ckpt_list:
+    #         args.resume_from_checkpoint = str(ckpt_list[-1])
 
     return args
 

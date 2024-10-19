@@ -484,7 +484,7 @@ class CmrxReconDataModule(pl.LightningDataModule):
         )
         parser.add_argument(
             "--num_workers",
-            default= 0, # it used to be 4 for parallel data processing
+            default= 4, # it used to be 4 for parallel data processing
             type=int,
             help="Number of workers to use in data loader",
         )

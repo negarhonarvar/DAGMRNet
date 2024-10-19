@@ -6,8 +6,9 @@ Date: 2023-10-15
 '''
 
 from argparse import ArgumentParser
-
+from models.DAGL import Model
 import fastmri
+from sympy import RR
 import torch
 from fastmri.data import transforms
 from fastmri.pl_modules import MriModule
@@ -45,22 +46,22 @@ class PromptMrModule(MriModule):
         weight_decay: float = 0.01,
         use_checkpoint: bool = False,
         low_mem: bool = False,
-         # DAGL-related parameters
-        scale: List[int] = [2],
-        n_resblocks: int = 16,
-        n_feats: int = 64,
-        rgb_range: int = 255,
-        res_scale: float = 1.0,
-        chop: bool = False,
-        self_ensemble: bool = False,
-        precision: str = 'single',
-        cpu: bool = False,
-        n_GPUs: int = 1,
-        save_models: bool = False,
-        pre_train: str = '',
-        resume: int = -1,
-        seed: int = 123,
-        print_model: bool = False,
+        dagl_config = {
+            'scale': 2,  # scaling factor
+            'n_resblocks': 2,  # number of residual blocks , 32
+            'n_feats': 4,  # number of feature maps , 64
+            'rgb_range': 255,  # range for RGB values
+            'res_scale': 1.0,  # scaling factor for residuals
+            'chop': True,  # whether to use memory-efficient processing
+            'self_ensemble': False,  # whether to use self-ensemble method
+            'cpu': False,  # whether to run on CPU
+            'n_GPUs': 1,  # number of GPUs
+            'save_models': False,  # whether to save intermediate models
+            'pre_train': '',  # path to pre-trained model, if any
+            'resume': 0,  # resume training from a checkpoint
+            'seed': 42,  # random seed for reproducibility
+            'print_model': False,  # whether to print the model details
+                     },
         **kwargs,
     ):
         """
@@ -117,28 +118,12 @@ class PromptMrModule(MriModule):
         self.no_use_ca = no_use_ca
         self.use_checkpoint = use_checkpoint
         self.low_mem = low_mem
+        self.dagl_config  = dagl_config
 
         self.lr = lr
         self.lr_step_size = lr_step_size
         self.lr_gamma = lr_gamma
         self.weight_decay = weight_decay
-
-        # DAGL-specific arguments
-        self.scale = scale
-        self.n_resblocks = n_resblocks
-        self.n_feats = n_feats
-        self.rgb_range = rgb_range
-        self.res_scale = res_scale
-        self.chop = chop
-        self.self_ensemble = self_ensemble
-        self.precision = precision
-        self.cpu = cpu
-        self.n_GPUs = n_GPUs
-        self.save_models = save_models
-        self.pre_train = pre_train
-        self.resume = resume
-        self.seed = seed
-        self.print_model = print_model
 
         self.promptmr = PromptMR(
             num_cascades=self.num_cascades,
@@ -158,24 +143,8 @@ class PromptMrModule(MriModule):
             no_use_ca = self.no_use_ca,
             use_checkpoint=self.use_checkpoint,
             low_mem = self.low_mem,
-            # DAGL arguments
-            scale=self.scale,
-            n_resblocks=self.n_resblocks,
-            n_feats=self.n_feats,
-            rgb_range=self.rgb_range,
-            res_scale=self.res_scale,
-            chop=self.chop,
-            self_ensemble=self.self_ensemble,
-            precision=self.precision,
-            cpu=self.cpu,
-            n_GPUs=self.n_GPUs,
-            save_models=self.save_models,
-            pre_train=self.pre_train,
-            resume=self.resume,
-            seed=self.seed,
-            print_model=self.print_model,
+            dagl_config = self.dagl_config,
         )
-
         self.loss = fastmri.SSIMLoss()
 
     def forward(self, masked_kspace, mask, num_low_frequencies):
@@ -389,71 +358,15 @@ class PromptMrModule(MriModule):
             help="Strength of weight decay regularization",
         )
         parser.add_argument(
-            "--use_checkpoint", action="store_true", help="Use checkpoint (default: False)"
+            "--use_checkpoint", 
+            action="store_true", 
+            help="Use checkpoint (default: False)"
         )
         parser.add_argument(
-            "--low_mem", action="store_true", help="consume less memory by computing sens_map coil by coil (default: False)"
+            "--low_mem", 
+            action="store_true", 
+            help="consume less memory by computing sens_map coil by coil (default: False)"
         )
 
-        # DAGL-specific arguments
-        parser.add_argument(
-            "--scale", default=[2], nargs="+", type=int, help="Upscaling factor for DAGL model"
-        )
-
-        parser.add_argument(
-            "--n_resblocks", default=16, type=int, help="Number of residual blocks in DAGL model"
-        )
-
-        parser.add_argument(
-            "--n_feats", default=64, type=int, help="Number of feature channels in DAGL"
-        )
-
-        parser.add_argument(
-            "--rgb_range", default=255, type=int, help="RGB range (e.g., 255 for image data)"
-        )
-
-        parser.add_argument(
-            "--res_scale", default=1.0, type=float, help="Residual scale factor in DAGL"
-        )
-
-        parser.add_argument(
-            "--chop", action="store_true", help="Use forward chopping for memory management"
-        )
-        
-        parser.add_argument(
-            "--self_ensemble", action="store_true", help="Enable self-ensemble for DAGL"
-        )
-
-        parser.add_argument(
-            "--precision", default="single", type=str, help="Precision mode ('single' or 'half')"
-        )
-
-        parser.add_argument(
-            "--cpu", action="store_true", help="Run the model on CPU instead of GPU"
-        )
-
-        parser.add_argument(
-            "--n_GPUs", default=1, type=int, help="Number of GPUs to use"
-        )
-
-        parser.add_argument(
-            "--save_models", action="store_true", help="Save models during training"
-        )
-
-        parser.add_argument(
-            "--pre_train", default='', type=str, help="Path to pretrained model"
-        )
-
-        parser.add_argument(
-            "--resume", default=-1, type=int, help="Resume from checkpoint (-1 = latest)"
-        )
-
-        parser.add_argument(
-            "--seed", default=123, type=int, help="Random seed for reproducibility"
-        )
-        
-        parser.add_argument(
-            "--print_model", action="store_true", help="Print model architecture"
-        )
 
         return parser
