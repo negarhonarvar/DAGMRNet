@@ -18,6 +18,18 @@ CUDA_VISIBLE_DEVICES=0 python train_promptmr_cmrxrecon.py \
 --num_gpus 1 \
 --combine_train_val \
 --use_checkpoint
+# train promptmr dagl model :
+CUDA_VISIBLE_DEVICES=0 python train_promptmr_cmrxrecon.py \
+--center_numbers 24 \
+--accelerations 4 8 10 \
+--challenge multicoil \
+--mask_type equispaced_fixed \
+--data_path D:/Paper/codes/MultiCoil \
+--h5py_folder h5_FullSample \
+--exp_name promptmr_trainval \
+--num_cascades 1 \
+--num_gpus 1 \
+--combine_train_val
 
 ## train promptmr-16cascades model
 CUDA_VISIBLE_DEVICES=0,1 python train_promptmr_cmrxrecon.py \
