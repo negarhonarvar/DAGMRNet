@@ -19,8 +19,6 @@ os.environ["RANK"] = "0"
 
 def cli_main(args):
     pl.seed_everything(args.seed)
-    checkpoint_dir = 'D:/Paper/codes/PromptMR/promptmr_examples/cmrxrecon/checkpoints/'  # Specify the path to save model checkpoints 
-    pre_trained_model = 'D:/Paper/codes/PromptMR/promptmr_examples/cmrxrecon/pretrained/model.pt'  # Specify path to pre-trained model if any
     
     # ------------
     # data
@@ -302,13 +300,13 @@ def build_args():
     acc_folder = "acc_" + "_".join(map(str, args.accelerations))
     args.default_root_dir = default_root_dir / args.exp_name / acc_folder
     # configure checkpointing in checkpoint_dir
-    checkpoint_dir = args.default_root_dir / "checkpoints"
+    checkpoint_dir = 'D:/Paper/codes/PromptMR/promptmr_examples/cmrxrecon/checkpoints/'  # Specify the path to save model checkpoints 
     if not checkpoint_dir.exists():
         checkpoint_dir.mkdir(parents=True)
 
     args.callbacks = [
         pl.callbacks.ModelCheckpoint(
-            dirpath=args.default_root_dir / "checkpoints",
+            dirpath=checkpoint_dir,
             save_top_k=True,
             verbose=True,
             monitor="validation_loss",

@@ -207,14 +207,15 @@ class Model(nn.Module):
     def forward(self, x):
         return self.model(x)
 
-    def save(self, apath, epoch, is_best=False):
-        torch.save(self.model.state_dict(), os.path.join(apath, 'model_latest.pt'))
+    def save(self, checkpoint_dir, epoch, is_best=False):
+        torch.save(self.model.state_dict(), os.path.join(checkpoint_dir, 'model_latest.pt'))
         if is_best:
-            torch.save(self.model.state_dict(), os.path.join(apath, 'model_best.pt'))
+            torch.save(self.model.state_dict(), os.path.join(checkpoint_dir, 'model_best.pt'))
 
-    def load(self, apath, pre_train='.', resume=-1):
+    def load(self, pre_trained_model, pre_train='.', resume=-1):
+        pre_trained_model = 'D:/Paper/codes/PromptMR/promptmr_examples/cmrxrecon/pretrained/model.pt'
         if resume == -1:
-            self.model.load_state_dict(torch.load(os.path.join(apath, 'model_latest.pt')))
+            self.model.load_state_dict(torch.load(os.path.join(pre_trained_model, 'model_latest.pt')))
         elif pre_train != '.':
             print('Loading model from {}'.format(pre_train))
             self.model.load_state_dict(torch.load(pre_train))
