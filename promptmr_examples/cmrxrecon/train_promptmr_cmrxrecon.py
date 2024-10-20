@@ -16,6 +16,9 @@ import pytorch_lightning as pl
 import os
 os.environ["WORLD_SIZE"] = "1"
 os.environ["RANK"] = "0"
+# import torch
+# print(torch.cuda.is_available())  # Should return True if a GPU is available
+# print(torch.cuda.device_count())  # Should return the number of GPUs available
 
 def cli_main(args):
     pl.seed_everything(args.seed)
@@ -301,8 +304,8 @@ def build_args():
     args.default_root_dir = default_root_dir / args.exp_name / acc_folder
     # configure checkpointing in checkpoint_dir
     checkpoint_dir = 'D:/Paper/codes/PromptMR/promptmr_examples/cmrxrecon/checkpoints/'  # Specify the path to save model checkpoints 
-    if not checkpoint_dir.exists():
-        checkpoint_dir.mkdir(parents=True)
+    # if not checkpoint_dir.exists():
+    #     checkpoint_dir.mkdir(parents=True)
 
     args.callbacks = [
         pl.callbacks.ModelCheckpoint(

@@ -248,8 +248,112 @@ class PromptUnet(nn.Module):
         # 4. last conv
         return self.conv_last(x)
 
-
 class NormPromptUnet(nn.Module):
+    def __init__(
+        self,
+        in_chans: int = 10,
+        out_chans: int = 10,
+        n_feat0: int = 48,
+        feature_dim: List[int] = [72, 96, 120],
+        prompt_dim: List[int] = [24, 48, 72],
+        len_prompt: List[int] = [5, 5, 5],
+        prompt_size: List[int] = [64, 32, 16],
+        n_enc_cab: List[int] = [2, 3, 3],
+        n_dec_cab: List[int] = [2, 2, 3],
+        n_skip_cab: List[int] = [1, 1, 1],
+        n_bottleneck_cab: int = 3,
+        no_use_ca: bool = False,
+        learnable_input_prompt=False,
+    ):
+
+        super().__init__()
+        self.unet = PromptUnet(in_chans=in_chans,
+                                out_chans = out_chans, 
+                                n_feat0=n_feat0,
+                                feature_dim = feature_dim,
+                                prompt_dim = prompt_dim,
+                                len_prompt = len_prompt,
+                                prompt_size = prompt_size,
+                                n_enc_cab = n_enc_cab,
+                                n_dec_cab = n_dec_cab,
+                                n_skip_cab = n_skip_cab,
+                                n_bottleneck_cab = n_bottleneck_cab,
+                                no_use_ca = no_use_ca,
+                                learnable_input_prompt=learnable_input_prompt,
+                                )
+
+    def complex_to_chan_dim(self, x: torch.Tensor) -> torch.Tensor:
+        b, c, h, w, two = x.shape
+        assert two == 2
+        return x.permute(0, 4, 1, 2, 3).reshape(b, 2 * c, h, w)
+
+    def chan_complex_to_last_dim(self, x: torch.Tensor) -> torch.Tensor:
+        b, c2, h, w = x.shape
+        assert c2 % 2 == 0
+        c = c2 // 2
+        return x.view(b, 2, c, h, w).permute(0, 2, 3, 4, 1).contiguous()
+
+    def norm(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        b, c, h, w = x.shape
+        x = x.reshape(b, c * h * w)
+
+        mean = x.mean(dim=1).view(b, 1, 1, 1)
+        std = x.std(dim=1).view(b, 1, 1, 1)
+
+        x = x.view(b, c, h, w)
+        return (x - mean) / std, mean, std
+
+    def unnorm(
+        self, x: torch.Tensor, mean: torch.Tensor, std: torch.Tensor
+    ) -> torch.Tensor:
+        return x * std + mean
+
+    def pad(
+        self, x: torch.Tensor
+    ) -> Tuple[torch.Tensor, Tuple[List[int], List[int], int, int]]:
+        _, _, h, w = x.shape
+        w_mult = ((w - 1) | 7) + 1
+        h_mult = ((h - 1) | 7) + 1
+        w_pad = [math.floor((w_mult - w) / 2), math.ceil((w_mult - w) / 2)]
+        h_pad = [math.floor((h_mult - h) / 2), math.ceil((h_mult - h) / 2)]
+        # TODO: fix this type when PyTorch fixes theirs
+        # the documentation lies - this actually takes a list
+        # https://github.com/pytorch/pytorch/blob/master/torch/nn/functional.py#L3457
+        # https://github.com/pytorch/pytorch/pull/16949
+        x = F.pad(x, w_pad + h_pad)
+
+        return x, (h_pad, w_pad, h_mult, w_mult)
+
+    def unpad(
+        self,
+        x: torch.Tensor,
+        h_pad: List[int],
+        w_pad: List[int],
+        h_mult: int,
+        w_mult: int,
+    ) -> torch.Tensor:
+        return x[..., h_pad[0]: h_mult - h_pad[1], w_pad[0]: w_mult - w_pad[1]]
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if not x.shape[-1] == 2:
+            raise ValueError("Last dimension must be 2 for complex.")
+
+        # get shapes for unet and normalize
+        x = self.complex_to_chan_dim(x)
+        x, mean, std = self.norm(x)
+        x, pad_sizes = self.pad(x)
+
+        x = self.unet(x)
+
+        # get shapes back and unnormalize
+        x = self.unpad(x, *pad_sizes)
+        x = self.unnorm(x, mean, std)
+        x = self.chan_complex_to_last_dim(x)
+
+        return x
+    
+
+class DynamicAttentiveGraphNet(nn.Module):
     def __init__(
         self,
         in_chans: int = 10,
@@ -349,18 +453,22 @@ class NormPromptUnet(nn.Module):
         # get shapes for unet and normalize
         x = self.complex_to_chan_dim(x)
         x, mean, std = self.norm(x)
-        x, pad_sizes = self.pad(x)
+        # x, pad_sizes = self.pad(x)
         print("*************************************************")
         print(x.shape)
         print(x.type)
         print("*************************************************")
-        undersampled_image = x[:, 0, :, :].unsqueeze(1)  # Extract undersampled image, add a channel dimension
+
+        # undersampled_image = x[:, 0, :, :].unsqueeze(1)  # Extract undersampled image, add a channel dimension
+
+
+        print("undersampled_image : ",x.shape)
 
         # Pass the undersampled image to the DAGL model
-        output = self.dagl_model(undersampled_image)
+        output = self.dagl_model(x)
         print(f"Output shape of dagl_model: {output.shape}")
         # get shapes back and unnormalize
-        output = self.unpad(output, *pad_sizes)
+        # output = self.unpad(output, *pad_sizes)
         output = self.unnorm(output, mean, std)
         output = self.chan_complex_to_last_dim(output)
 
@@ -663,7 +771,7 @@ class PromptMR(nn.Module):
         )
         self.cascades = nn.ModuleList(
             [PromptMRBlock
-             (NormPromptUnet
+             (DynamicAttentiveGraphNet
                 (2*num_adj_slices, 2*num_adj_slices, n_feat0, feature_dim, 
                  prompt_dim, len_prompt, prompt_size, n_enc_cab, n_dec_cab, n_skip_cab,
                    n_bottleneck_cab, no_use_ca,dagl_config), 

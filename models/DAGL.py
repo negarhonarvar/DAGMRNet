@@ -171,7 +171,7 @@ class RR(nn.Module):
         res_scale = args['res_scale']
 
         # Head module (input channels for grayscale images is 1)
-        m_head = [conv(1, n_feats, kernel_size)]  # Adjust input channel to 1 for grayscale
+        m_head = [conv(2, n_feats, kernel_size)]  # Adjust input channel to 1 for grayscale
 
         # Body module
         m_body = [
@@ -191,6 +191,7 @@ class RR(nn.Module):
 
     def forward(self, x):
         # Pass the input through the network
+        print("x shape :" , x.shape)
         res = self.head(x)
         res = self.body(res)
         res = self.tail(res)
