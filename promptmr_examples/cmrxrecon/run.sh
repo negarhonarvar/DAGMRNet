@@ -18,7 +18,7 @@ CUDA_VISIBLE_DEVICES=0 python train_promptmr_cmrxrecon.py \
 --num_gpus 1 \
 --combine_train_val \
 --use_checkpoint
-# train promptmr dagl model :
+# train promptmr gnn model :
 CUDA_VISIBLE_DEVICES=0 python train_promptmr_cmrxrecon.py \
 --center_numbers 24 \
 --accelerations 4 8 10 \

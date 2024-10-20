@@ -499,27 +499,50 @@ class SensitivityModel(nn.Module):
 
         return x.view(b, adj_coil, h, w, two)
 
+    # def get_pad_and_num_low_freqs(
+    #     self, mask: torch.Tensor, num_low_frequencies: Optional[int] = None
+    # ) -> Tuple[torch.Tensor, torch.Tensor]:
+    #     if num_low_frequencies is None or num_low_frequencies == 0:
+    #         # get low frequency line locations and mask them out
+    #         squeezed_mask = mask[:, 0, 0, :, 0].to(torch.int8)
+    #         cent = squeezed_mask.shape[1] // 2
+    #         # running argmin returns the first non-zero
+    #         left = torch.argmin(squeezed_mask[:, :cent].flip(1), dim=1)
+    #         right = torch.argmin(squeezed_mask[:, cent:], dim=1)
+    #         num_low_frequencies_tensor = torch.max(
+    #             2 * torch.min(left, right), torch.ones_like(left)
+    #         )  # force a symmetric center unless 1
+    #     else:
+    #         num_low_frequencies_tensor = num_low_frequencies * torch.ones(
+    #             mask.shape[0], dtype=mask.dtype, device=mask.device
+    #         )
+
+    #     pad = (mask.shape[-2] - num_low_frequencies_tensor + 1) // 2
+
+    #     return pad.type(torch.long), num_low_frequencies_tensor.type(torch.long)
+
     def get_pad_and_num_low_freqs(
-        self, mask: torch.Tensor, num_low_frequencies: Optional[int] = None
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        if num_low_frequencies is None or num_low_frequencies == 0:
-            # get low frequency line locations and mask them out
-            squeezed_mask = mask[:, 0, 0, :, 0].to(torch.int8)
-            cent = squeezed_mask.shape[1] // 2
-            # running argmin returns the first non-zero
-            left = torch.argmin(squeezed_mask[:, :cent].flip(1), dim=1)
-            right = torch.argmin(squeezed_mask[:, cent:], dim=1)
-            num_low_frequencies_tensor = torch.max(
-                2 * torch.min(left, right), torch.ones_like(left)
-            )  # force a symmetric center unless 1
-        else:
-            num_low_frequencies_tensor = num_low_frequencies * torch.ones(
-                mask.shape[0], dtype=mask.dtype, device=mask.device
-            )
+            self, mask: torch.Tensor, num_low_frequencies: Optional[torch.Tensor] = None
+        ) -> Tuple[torch.Tensor, torch.Tensor]:
+            if num_low_frequencies is None or torch.all(num_low_frequencies == 0):
+                # get low frequency line locations and mask them out
+                squeezed_mask = mask[:, 0, 0, :, 0].to(torch.int8)
+                cent = squeezed_mask.shape[1] // 2
+                # running argmin returns the first non-zero
+                left = torch.argmin(squeezed_mask[:, :cent].flip(1), dim=1)
+                right = torch.argmin(squeezed_mask[:, cent:], dim=1)
+                num_low_frequencies_tensor = torch.max(
+                    2 * torch.min(left, right), torch.ones_like(left)
+                )  # force a symmetric center unless 1
+            else:
+                num_low_frequencies_tensor = num_low_frequencies * torch.ones(
+                    mask.shape[0], dtype=mask.dtype, device=mask.device
+                )
 
-        pad = (mask.shape[-2] - num_low_frequencies_tensor + 1) // 2
+            pad = (mask.shape[-2] - num_low_frequencies_tensor + 1) // 2
 
-        return pad.type(torch.long), num_low_frequencies_tensor.type(torch.long)
+            return pad.type(torch.long), num_low_frequencies_tensor.type(torch.long)
+
 
     def compute_sens(self, model:nn.Module, images: torch.Tensor, compute_per_coil: bool) -> torch.Tensor:
         # batch_size * n_coils

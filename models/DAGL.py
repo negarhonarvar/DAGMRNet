@@ -9,7 +9,7 @@ import os
 #########################################################################
 # -------------------------------  DAGL ----------------------------------
 
-def default_conv(in_channels, out_channels, kernel_size, stride=1, bias=True):
+def default_conv(in_channels, out_channels, kernel_size = 3, stride=1, bias=True):
     return nn.Conv2d(
         in_channels, out_channels, kernel_size,
         padding=(kernel_size // 2), stride=stride, bias=bias)
@@ -24,7 +24,7 @@ class MeanShift(nn.Conv2d):
 
 
 class ResBlock(nn.Module):
-    def __init__(self, conv, n_feats, kernel_size, bias=True, act=nn.PReLU(), res_scale=1):
+    def __init__(self, conv, n_feats, kernel_size = 3, bias=True, act=nn.PReLU(), res_scale=0.1):
         super(ResBlock, self).__init__()
         m = [conv(n_feats, n_feats, kernel_size, bias=bias)]
         m.append(act)
@@ -76,7 +76,7 @@ Graph model
 """
 class CE(nn.Module):
     def __init__(self, ksize=7, stride_1=1 # 4
-                 , stride_2=1, softmax_scale=10, in_channels=4, inter_channels=1): #  in_channels=64, inter_channels=16
+                 , stride_2=1, softmax_scale=10, in_channels=4, inter_channels=2): #  in_channels=64, inter_channels=16
         super(CE, self).__init__()
         self.ksize = ksize
         self.stride_1 = stride_1
@@ -126,37 +126,38 @@ class CES(nn.Module):
         # stage 1 (4 heads)
         self.c1_1 = CE(in_channels=in_channels)
         self.c1_2 = CE(in_channels=in_channels)
-        self.c1_3 = CE(in_channels=in_channels)
-        self.c1_4 = CE(in_channels=in_channels)
-        self.c1_c = nn.Conv2d(in_channels, in_channels, 1, 1, 0)
+        # self.c1_3 = CE(in_channels=in_channels)
+        # self.c1_4 = CE(in_channels=in_channels)
+        # self.c1_c = nn.Conv2d(in_channels, in_channels, 1, 1, 0)
 
-        # stage 2 (4 heads)
-        self.c2_1 = CE(in_channels=in_channels)
-        self.c2_2 = CE(in_channels=in_channels)
-        self.c2_3 = CE(in_channels=in_channels)
-        self.c2_4 = CE(in_channels=in_channels)
-        self.c2_c = nn.Conv2d(in_channels, in_channels, 1, 1, 0)
+        # # stage 2 (4 heads)
+        # self.c2_1 = CE(in_channels=in_channels)
+        # self.c2_2 = CE(in_channels=in_channels)
+        # self.c2_3 = CE(in_channels=in_channels)
+        # self.c2_4 = CE(in_channels=in_channels)
+        # self.c2_c = nn.Conv2d(in_channels, in_channels, 1, 1, 0)
 
-        # stage 3 (4 heads)
-        self.c3_1 = CE(in_channels=in_channels)
-        self.c3_2 = CE(in_channels=in_channels)
-        self.c3_3 = CE(in_channels=in_channels)
-        self.c3_4 = CE(in_channels=in_channels)
-        self.c3_c = nn.Conv2d(in_channels, in_channels, 1, 1, 0)
+        # # stage 3 (4 heads)
+        # self.c3_1 = CE(in_channels=in_channels)
+        # self.c3_2 = CE(in_channels=in_channels)
+        # self.c3_3 = CE(in_channels=in_channels)
+        # self.c3_4 = CE(in_channels=in_channels)
+        # self.c3_c = nn.Conv2d(in_channels, in_channels, 1, 1, 0)
 
     def forward(self, x):
         # Stage 1 (4-head)
-        print(self.c1_1(x).shape, self.c1_2(x).shape, self.c1_3(x).shape, self.c1_4(x).shape)
-        print(x.shape)
-        out = self.c1_c(torch.cat((self.c1_1(x), self.c1_2(x), self.c1_3(x), self.c1_4(x)), dim=1)) + x
+        # print(self.c1_1(x).shape, self.c1_2(x).shape, self.c1_3(x).shape, self.c1_4(x).shape)
+        # print(x.shape)
+        # out = self.c1_c(torch.cat((self.c1_1(x), self.c1_2(x), self.c1_3(x), self.c1_4(x)), dim=1)) + x
+        out = (torch.cat((self.c1_1(x),self.c1_2(x)),dim = 1)) + x
         out = self.RBS1(out)
 
-        # Stage 2 (4-head)
-        out = self.c2_c(torch.cat((self.c2_1(out), self.c2_2(out), self.c2_3(out), self.c2_4(out)), dim=1)) + out
-        out = self.RBS2(out)
+        # # Stage 2 (4-head)
+        # out = self.c2_c(torch.cat((self.c2_1(out), self.c2_2(out), self.c2_3(out), self.c2_4(out)), dim=1)) + out
+        # out = self.RBS2(out)
 
-        # Stage 3 (4-head)
-        out = self.c3_c(torch.cat((self.c3_1(out), self.c3_2(out), self.c3_3(out), self.c3_4(out)), dim=1)) + out
+        # # Stage 3 (4-head)
+        # out = self.c3_c(torch.cat((self.c3_1(out), self.c3_2(out), self.c3_3(out), self.c3_4(out)), dim=1)) + out
         return out
 
 
@@ -199,7 +200,7 @@ class RR(nn.Module):
 class Model(nn.Module):
     def __init__(self, args, ckp):
         super(Model, self).__init__()
-        print('Building DAGL model for grayscale images...')
+        print('Building GNN model for grayscale images...')
         
         self.model = RR(args)
 
