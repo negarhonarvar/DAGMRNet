@@ -1,0 +1,48 @@
+feature_dim:
+- 72
+- 96
+- 120
+len_prompt:
+- 5
+- 5
+- 5
+low_mem: false
+lr: 0.0002
+lr_gamma: 0.1
+lr_step_size: 11
+n_bottleneck_cab: 3
+n_dec_cab:
+- 2
+- 2
+- 3
+n_enc_cab:
+- 2
+- 3
+- 3
+n_feat0: 4
+n_skip_cab:
+- 1
+- 1
+- 1
+no_use_ca: false
+num_adj_slices: 1
+num_cascades: 1
+prompt_dim:
+- 24
+- 48
+- 72
+prompt_size:
+- 64
+- 32
+- 16
+sens_feature_dim:
+- 36
+- 48
+- 60
+sens_n_feat0: 2
+sens_prompt_dim:
+- 12
+- 24
+- 36
+use_checkpoint: true
+weight_decay: 0.01
