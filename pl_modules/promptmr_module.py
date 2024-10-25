@@ -40,8 +40,8 @@ class PromptMrModule(MriModule):
         low_mem: bool = False,
         dagl_config = {
             'scale': 2,  # scaling factor
-            'n_resblocks': 2,  # number of residual blocks , 32
-            'n_feats': 4,  # number of feature maps , 64
+            'n_resblocks': 4,  # number of residual blocks , 16
+            'n_feats': 64,  # number of feature maps , 64
             'rgb_range': 255,  # range for RGB values
             'res_scale': 1.0,  # scaling factor for residuals
             'chop': True,  # whether to use memory-efficient processing
@@ -228,7 +228,7 @@ class PromptMrModule(MriModule):
         # network params
         parser.add_argument(
             "--num_cascades",
-            default=1, # default = 12
+            default=4, # default = 12
             type=int,
             help="Number of PromptMR cascades",
         )

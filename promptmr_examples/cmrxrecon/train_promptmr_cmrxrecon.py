@@ -11,18 +11,17 @@ from pl_modules.cmrxrecon_data_module import CmrxReconDataModule
 from pl_modules.promptmr_module import PromptMrModule
 from data.subsample import create_mask_for_mask_type
 import pytorch_lightning as pl
-# from pytorch_lightning.utilities.cli import LightningCLI
+from pytorch_lightning.loggers import TensorBoardLogger
+import torch
 
-import os
-os.environ["WORLD_SIZE"] = "1"
-os.environ["RANK"] = "0"
-# import torch
-# print(torch.cuda.is_available())  # Should return True if a GPU is available
-# print(torch.cuda.device_count())  # Should return the number of GPUs available
+# clearing gpu cache in case it is occupied by previous run data
+torch.cuda.empty_cache()
+
+
 
 def cli_main(args):
     pl.seed_everything(args.seed)
-    
+
     # ------------
     # data
     # ------------
@@ -37,7 +36,8 @@ def cli_main(args):
     # ptl data module - this handles data loaders
     data_module = CmrxReconDataModule(
         data_path=args.data_path,
-        h5py_folder=args.h5py_folder,
+        # h5py_folder=args.h5py_folder,
+        h5py_folder="h5_FullSample",
         challenge=args.challenge,
         train_transform=train_transform,
         val_transform=val_transform,
@@ -45,33 +45,18 @@ def cli_main(args):
         combine_train_val=args.combine_train_val, # combine train and val data for train
         test_split=args.test_split,
         test_path=args.test_path,
-        sample_rate=args.sample_rate,
-        batch_size=args.batch_size,
-        num_workers=12 ,    # args.num_workers,
+        sample_rate=0.01,
+        batch_size=1,
+        num_workers=8,
         distributed_sampler=(args.strategy in (
             "ddp_find_unused_parameters_false", "ddp", "ddp_cpu")),
     )
-    # Define DAGL configuration
-    dagl_config = {
-        'scale': args.scale,
-        'n_resblocks': args.n_resblocks,
-        'n_feats': args.n_feats,
-        'rgb_range': args.rgb_range,
-        'res_scale': args.res_scale,
-        'chop': args.chop,
-        'self_ensemble': args.self_ensemble,
-        'cpu': args.cpu,
-        'n_GPUs': args.n_GPUs,
-        'save_models': args.save_models,
-        'pre_train': args.pre_train,
-        'resume': args.resume,
-        'seed': args.seed,
-    }
+
     # ------------
     # model
     # ------------
     model = PromptMrModule(
-        num_cascades=args.num_cascades,
+        num_cascades= 1,    # args.num_cascades,
         num_adj_slices=args.num_adj_slices,
         n_feat0=args.n_feat0,
         feature_dim = args.feature_dim,
@@ -96,13 +81,13 @@ def cli_main(args):
 
         use_checkpoint=args.use_checkpoint,
         low_mem=args.low_mem,
-        dagl_config= dagl_config,
     )
+    logger = TensorBoardLogger("tb_logs", name="promptmr_model")
 
     # ------------
     # trainer
     # ------------
-    trainer = pl.Trainer.from_argparse_args(args)
+    trainer = pl.Trainer.from_argparse_args(args , logger = logger)
 
     # ------------
     # run
@@ -120,12 +105,20 @@ def build_args():
 
     # basic args
     # num_gpus = 2
+    
     backend = "ddp_find_unused_parameters_false"
+    # backend = "ddp_cpu"
+
     batch_size = 1
 
     # set defaults based on optional directory config
-    data_path = pathlib.Path('.')
-    default_root_dir = data_path / "experiments"
+    data_path = pathlib.Path(r"G:\CMRxRecon2024\home2\Raw_data\MICCAIChallenge2024\ChallengeData\MultiCoil")
+    # data_path = pathlib.Path(r"D:\\CMRxRecon2023\\MultiCoil")
+
+    # data_path = "D:\\CMRxRecon2023\\MultiCoil"
+
+    default_root_dir = data_path / "test"
+    # default_root_dir = data_path + "\\experiments"
 
     # client arguments
     parser.add_argument(
@@ -161,7 +154,7 @@ def build_args():
     parser.add_argument(
         "--center_numbers",
         nargs="+",
-        default=[24],
+        default=[16],
         type=int,
         help="Number of center lines to use in mask",
     )
@@ -172,86 +165,12 @@ def build_args():
         type=int,
         help="Acceleration rates to use for masks",
     )
-    # DAGl model args
-    parser.add_argument(
-        '--scale', 
-        type=int, 
-        default=2, 
-        help='Scaling factor for DAGL'
-    )
-    parser.add_argument(
-        '--n_resblocks', 
-        type=int, 
-        default=2,  # 32
-        help='Number of residual blocks in DAGL'
-    )
-    parser.add_argument(
-        '--n_feats', 
-        type=int, 
-        default=4,  # 64
-        help='Number of feature maps in DAGL'
-    )
-    parser.add_argument(
-        '--rgb_range', 
-        type=int, 
-        default=255, 
-        help='Range for pixel values'
-    )
-    parser.add_argument(
-        '--res_scale', 
-        type=float, 
-        default=1.0, 
-        help='Residual scaling factor'
-    )
-    parser.add_argument(
-        '--chop', 
-        action='store_true', 
-        help='Use memory-efficient forward pass'
-    )
-    parser.add_argument(
-        '--self_ensemble', 
-        action='store_true', 
-        help='Use self-ensemble method'
-    )
-    parser.add_argument(
-        '--cpu', 
-        action='store_true', 
-        help='Use CPU instead of GPU'
-    )
-    parser.add_argument(
-        '--n_GPUs', 
-        type=int, 
-        default=1, 
-        help='Number of GPUs to use'
-    )
-    parser.add_argument(
-        '--save_models', 
-        action='store_true', 
-        help='Save models during training'
-    )
-    parser.add_argument(
-        '--pre_train',
-        type=str, 
-        default='', 
-        help='Path to pre-trained model'
-    )
-    parser.add_argument(
-        '--resume', 
-        type=int,
-        default=0, 
-        help='Resume training from checkpoint'
-    )
-    parser.add_argument(
-        '--seed', 
-        type=int, 
-        default=42, 
-        help='Random seed'
-    )
+
     # data config with path to fastMRI data and batch size
     parser = CmrxReconDataModule.add_data_specific_args(parser)
     parser.set_defaults(
         data_path=data_path,  # path to fastMRI data
-        mask_type="equispaced_fraction",  # VarNet uses equispaced mask
+        mask_type="equispaced_fixed",  # VarNet uses equispaced mask
         challenge="multicoil",  # only multicoil implemented for VarNet
         batch_size=batch_size,  # number of samples per batch
         test_path=None,  # path for test split, overwrites data_path
@@ -260,8 +179,8 @@ def build_args():
     # module config
     parser = PromptMrModule.add_model_specific_args(parser)
     parser.set_defaults(
-        num_cascades=1,  # number of unrolled iterations , default value was 12
-        num_adj_slices=1,  # number of adjacent slices , default value was 5
+        num_cascades=1,  # number of unrolled iterations
+        num_adj_slices=1,  # number of adjacent slices
 
         n_feat0=4,  # number of top-level channels for PromptUnet , default value was 48
         feature_dim = [6, 8, 10], # [72, 96, 120]
@@ -271,12 +190,10 @@ def build_args():
         sens_feature_dim = [3, 4, 5], # [36, 48, 60]
         sens_prompt_dim = [1, 2, 3], # [12, 24, 36]
 
-        len_prompt = [5, 5, 5],
-        prompt_size = [16, 8, 4], # =[64, 32, 16]
-        n_enc_cab = [1, 1, 1], # [2, 3, 3]
-        n_dec_cab = [1, 1, 1], # [2, 2, 3]
+        n_enc_cab = [1, 1, 1],#[2, 2, 3],
+        n_dec_cab = [1, 1, 1],#[2, 2, 3],
         n_skip_cab = [1, 1, 1],
-        n_bottleneck_cab = 3,
+        n_bottleneck_cab = 1,#3,
         no_use_ca = False,
         lr=0.0002,  # AdamW learning rate;
         lr_step_size=11,  # epoch at which to decrease learning rate
@@ -288,40 +205,46 @@ def build_args():
     # trainer config
     parser = pl.Trainer.add_argparse_args(parser)
     parser.set_defaults(
-        # gpus=num_gpus,  # number of gpus to use
+        # gpus=1,  # number of gpus to use
         replace_sampler_ddp=False,  # this is necessary for volume dispatch during val
-        strategy=None,  # what distributed version to use , it was "backend" for multiple gpu's
+        strategy='dp',  # what distributed version to use
+        # strategy="dp",  # what distributed version to use
         seed=42,  # random seed
         deterministic=False,  # makes things slower, but deterministic
         # default_root_dir=default_root_dir,  # directory for logs and checkpoints
-        max_epochs=1,  # max number of epochs , used to be 12
+        max_epochs=12,  # max number of epochs
         gradient_clip_val=0.01
     )
 
     args = parser.parse_args()
     args.gpus = args.num_gpus # override pl.Trainer gpus arg
+
     acc_folder = "acc_" + "_".join(map(str, args.accelerations))
     args.default_root_dir = default_root_dir / args.exp_name / acc_folder
+    # args.default_root_dir = default_root_dir + "\\" + args.exp_name + "\\" + acc_folder
+
     # configure checkpointing in checkpoint_dir
-    checkpoint_dir = 'D:/Paper/codes/PromptMR/promptmr_examples/cmrxrecon/checkpoints/'  # Specify the path to save model checkpoints 
-    # if not checkpoint_dir.exists():
-    #     checkpoint_dir.mkdir(parents=True)
+    checkpoint_dir = args.default_root_dir / "checkpoints"
+    # checkpoint_dir = args.default_root_dir + "\\" + "checkpoints"
+
+    if not checkpoint_dir.exists():
+        checkpoint_dir.mkdir(parents=True)
 
     args.callbacks = [
         pl.callbacks.ModelCheckpoint(
-            dirpath=checkpoint_dir,
+            dirpath=args.default_root_dir / "checkpoints",
             save_top_k=True,
             verbose=True,
             monitor="validation_loss",
             mode="min",
         )
     ]
-    args.resume_from_checkpoint = None
+
     # set default checkpoint if one exists in our checkpoint directory
-    # if args.resume_from_checkpoint is None:
-    #     ckpt_list = sorted(checkpoint_dir.glob("*.ckpt"), key=os.path.getmtime)
-    #     if ckpt_list:
-    #         args.resume_from_checkpoint = str(ckpt_list[-1])
+    if args.resume_from_checkpoint is None:
+        ckpt_list = sorted(checkpoint_dir.glob("*.ckpt"), key=os.path.getmtime)
+        if ckpt_list:
+            args.resume_from_checkpoint = str(ckpt_list[-1])
 
     return args
 

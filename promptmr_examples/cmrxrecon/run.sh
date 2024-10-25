@@ -1,6 +1,6 @@
 # 0. prepare dataset
 python prepare_h5py_dataset_for_training.py \
---data_path D:/Paper/codes/MultiCoil \
+--data_path D:/Negar/MultiCoil \
 --h5py_folder h5_FullSample
 
 # 1. training command
@@ -24,7 +24,7 @@ CUDA_VISIBLE_DEVICES=0 python train_promptmr_cmrxrecon.py \
 --accelerations 4 8 10 \
 --challenge multicoil \
 --mask_type equispaced_fixed \
---data_path D:/Paper/codes/MultiCoil \
+--data_path D:/Negar \
 --h5py_folder h5_FullSample \
 --exp_name promptmr_trainval \
 --num_cascades 1 \

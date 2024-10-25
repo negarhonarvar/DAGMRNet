@@ -45,7 +45,7 @@ if __name__ == '__main__':
     parser.add_argument(
             "--data_path",
             type=str,
-            default="D:/Paper/codes/MultiCoil",
+            default="D:/Negar/MultiCoil",
             help="Path to the multi-coil MATLAB folder",
         )
 

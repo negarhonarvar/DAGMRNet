@@ -46,7 +46,7 @@ class MaskFunc:
     def __init__(
         self,
         center_fractions: Sequence[float],
-        accelerations: Sequence[int],
+        accelerations: Sequence[int] ,
         allow_any_combination: bool = False,
         seed: Optional[int] = None,
     ):
@@ -63,14 +63,14 @@ class MaskFunc:
             seed: Seed for starting the internal random number generator of the
                 ``MaskFunc``.
         """
-        if len(center_fractions) != len(accelerations) and not allow_any_combination:
-            raise ValueError(
-                "Number of center fractions should match number of accelerations "
-                "if allow_any_combination is False."
-            )
+        # if len(center_fractions) != len(accelerations) and not allow_any_combination:
+        #     raise ValueError(
+        #         "Number of center fractions should match number of accelerations "
+        #         "if allow_any_combination is False."
+        #     )
 
-        self.center_fractions = center_fractions
-        self.accelerations = accelerations
+        self.center_fractions = [16] #center_fractions
+        self.accelerations =  [8] #accelerations
         self.allow_any_combination = allow_any_combination
         self.rng = np.random.RandomState(seed)
 

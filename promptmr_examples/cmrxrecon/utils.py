@@ -109,19 +109,16 @@ def count_parameters(model1 , model2):
     return gnn_param + promptmr_param
 
 
-def count_trainable_parameters(model):
-    return (
-        sum(p.numel() for p in model.parameters() if p.requires_grad)
-        if model is not None
-        else 0
-    )
+def count_trainable_parameters(model1, model2):
+    
+        model1_params =  sum(p.numel() for p in model1.parameters() if p.requires_grad) if model1 is not None else 0
+        model2_params = sum(p.numel() for p in model2.parameters() if p.requires_grad) if model2 is not None else 0
+        return model1_params + model2_params
 
-def count_untrainable_parameters(model):
-    return (
-        sum(p.numel() for p in model.parameters() if not p.requires_grad)
-        if model is not None
-        else 0
-    )
+def count_untrainable_parameters(model1 , model2):
+    model1_params =  sum(p.numel() for p in model1.parameters() if not p.requires_grad) if model1 is not None else 0
+    model2_params = sum(p.numel() for p in model2.parameters() if not p.requires_grad) if model2 is not None else 0
+    return model1_params + model2_params
 
 def loadmat(filename):
     """

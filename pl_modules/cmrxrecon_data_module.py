@@ -2,7 +2,6 @@
 Pytorch Lightning module to handle fastMRI and CMRxRecon data. 
 Modified from https://github.com/facebookresearch/fastMRI/blob/master/fastmri/pl_modules/data_module.py
 """
-# all adjustments in this file are due to lack of multiple gpu's for distribution
 
 from argparse import ArgumentParser
 from pathlib import Path
@@ -14,6 +13,7 @@ import torch
 import fastmri
 from data.mri_data import CombinedCmrxReconSliceDataset, CmrxReconSliceDataset
 
+
 def worker_init_fn(worker_id):
     """Handle random seeding for all mask_func."""
     worker_info = torch.utils.data.get_worker_info()
@@ -21,66 +21,43 @@ def worker_init_fn(worker_id):
         CmrxReconSliceDataset, CombinedCmrxReconSliceDataset
     ] = worker_info.dataset  # pylint: disable=no-member
 
+    # Check if we are using DDP
+    is_ddp = False
+    if torch.distributed.is_available():
+        if torch.distributed.is_initialized():
+            is_ddp = True
+
     # for NumPy random seed we need it to be in this range
     base_seed = worker_info.seed  # pylint: disable=no-member
 
-    # Use simple seeding without distributed logic
     if isinstance(data, CombinedCmrxReconSliceDataset):
         for i, dataset in enumerate(data.datasets):
             if dataset.transform.mask_func is not None:
-                seed_i = base_seed - worker_info.id + worker_info.id * len(data.datasets) + i
+                if (
+                    is_ddp
+                ):  # DDP training: unique seed is determined by worker, device, dataset
+                    seed_i = (
+                        base_seed
+                        - worker_info.id
+                        + torch.distributed.get_rank()
+                        * (worker_info.num_workers * len(data.datasets))
+                        + worker_info.id * len(data.datasets)
+                        + i
+                    )
+                else:
+                    seed_i = (
+                        base_seed
+                        - worker_info.id
+                        + worker_info.id * len(data.datasets)
+                        + i
+                    )
                 dataset.transform.mask_func.rng.seed(seed_i % (2**32 - 1))
     elif data.transform.mask_func is not None:
-        data.transform.mask_func.rng.seed(base_seed % (2**32 - 1))
-
-
-# def worker_init_fn(worker_id):
-#     """Handle random seeding for all mask_func."""
-#     worker_info = torch.utils.data.get_worker_info()
-#     data: Union[
-#         CmrxReconSliceDataset, CombinedCmrxReconSliceDataset
-#     ] = worker_info.dataset  # pylint: disable=no-member
-
-#     # Check if we are using DDP
-#     is_ddp = False
-#     # if torch.distributed.is_available():
-#     #     if torch.distributed.is_initialized():
-#     #         is_ddp = True
-
-#     if torch.distributed.is_available() and torch.distributed.is_initialized():
-#         is_ddp = True
-
-#     # for NumPy random seed we need it to be in this range
-#     base_seed = worker_info.seed  # pylint: disable=no-member
-
-#     if isinstance(data, CombinedCmrxReconSliceDataset):
-#         for i, dataset in enumerate(data.datasets):
-#             if dataset.transform.mask_func is not None:
-#                 if (
-#                     is_ddp
-#                 ):  # DDP training: unique seed is determined by worker, device, dataset
-#                     seed_i = (
-#                         base_seed
-#                         - worker_info.id
-#                         + torch.distributed.get_rank()
-#                         * (worker_info.num_workers * len(data.datasets))
-#                         + worker_info.id * len(data.datasets)
-#                         + i
-#                     )
-#                 else:
-#                     seed_i = (
-#                         base_seed
-#                         - worker_info.id
-#                         + worker_info.id * len(data.datasets)
-#                         + i
-#                     )
-#                 dataset.transform.mask_func.rng.seed(seed_i % (2**32 - 1))
-#     elif data.transform.mask_func is not None:
-#         if is_ddp:  # DDP training: unique seed is determined by worker and device
-#             seed = base_seed + torch.distributed.get_rank() * worker_info.num_workers
-#         else:
-#             seed = base_seed
-#         data.transform.mask_func.rng.seed(seed % (2**32 - 1))
+        if is_ddp:  # DDP training: unique seed is determined by worker and device
+            seed = base_seed + torch.distributed.get_rank() * worker_info.num_workers
+        else:
+            seed = base_seed
+        data.transform.mask_func.rng.seed(seed % (2**32 - 1))
 
 
 def _check_both_not_none(val1, val2):
@@ -125,11 +102,8 @@ class CmrxReconDataModule(pl.LightningDataModule):
         test_filter: Optional[Callable] = None,
         use_dataset_cache_file: bool = True,
         batch_size: int = 1,
-        num_workers: int = 4,  # valued 0 in main 
+        num_workers: int = 8,
         distributed_sampler: bool = False,
-        isAvailable : bool=False,
-        isGroupInitialized : bool=False,
-            
     ):
         """
         Args:
@@ -172,15 +146,6 @@ class CmrxReconDataModule(pl.LightningDataModule):
             num_workers: Number of workers for PyTorch dataloader.
             distributed_sampler: Whether to use a distributed sampler. This
                 should be set to True if training with ddp.
-            "isAvailable",
-            default=False,
-            type=bool,
-            help="Availability of multiple gpu's for training",
-
-            "isGroupInitialzied",
-            default=False,
-            type=bool,
-            help="Initialization of the process group for distributed training",
         """
         super().__init__()
 
@@ -195,7 +160,13 @@ class CmrxReconDataModule(pl.LightningDataModule):
                 "Can set test_sample_rate or test_volume_sample_rate, but not both."
             )
         # TODO: ugly but working code, mapping data will be loaded in CmrxReconSliceDataset
-        self.data_path = data_path / 'Cine' / 'TrainingSet' / h5py_folder 
+        # self.data_path = data_path / 'Cine' / 'TrainingSet' / h5py_folder 
+        print("data_path:", data_path)
+        print("'Cine':", 'Cine')
+        print("'TrainingSet':", 'TrainingSet')
+        print("h5py_folder:", h5py_folder)
+        self.data_path = data_path.joinpath('Cine', 'TrainingSet', h5py_folder)
+
         self.challenge = challenge
         self.train_transform = train_transform
         self.val_transform = val_transform
@@ -216,8 +187,6 @@ class CmrxReconDataModule(pl.LightningDataModule):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.distributed_sampler = distributed_sampler
-        self.isAvailable = isAvailable
-        self.isGroupInitialized = isGroupInitialized
 
     def _create_data_loader(
         self,
@@ -300,19 +269,11 @@ class CmrxReconDataModule(pl.LightningDataModule):
         # ensure that entire volumes go to the same GPU in the ddp setting
         sampler = None
 
-        if self.distributed_sampler and self.isGroupInitialized and self.isAvailable:
+        if self.distributed_sampler:
             if is_train:
                 sampler = torch.utils.data.DistributedSampler(dataset)
-            else :
+            else:
                 sampler = fastmri.data.VolumeSampler(dataset, shuffle=False)
-        else :
-            sampler = None # for single gpu
-
-        # if self.distributed_sampler:
-            # if is_train:
-            #     sampler = torch.utils.data.DistributedSampler(dataset)
-            # else:
-            #     sampler = fastmri.data.VolumeSampler(dataset, shuffle=False)
 
         dataloader = torch.utils.data.DataLoader(
             dataset=dataset,
@@ -351,15 +312,13 @@ class CmrxReconDataModule(pl.LightningDataModule):
                 sample_rate = self.sample_rate  # if i == 0 else 1.0
                 volume_sample_rate = self.volume_sample_rate  # if i == 0 else None
                 _ = CmrxReconSliceDataset(
-                    # root=data_path,
-                    root = "D:\Paper\codes\MultiCoil\Cine\TrainingSet\h5_FullSample",
+                    root=data_path,
                     transform=data_transform,
                     sample_rate=sample_rate,
                     volume_sample_rate=volume_sample_rate,
                     challenge=self.challenge,
                     use_dataset_cache=self.use_dataset_cache_file,
                 )
-   # Inside _create_data_loader, the VolumeSampler is used
 
     def train_dataloader(self):
         return self._create_data_loader(self.train_transform, data_partition="train")
@@ -484,7 +443,7 @@ class CmrxReconDataModule(pl.LightningDataModule):
         )
         parser.add_argument(
             "--num_workers",
-            default= 4, # it used to be 4 for parallel data processing
+            default=8,
             type=int,
             help="Number of workers to use in data loader",
         )

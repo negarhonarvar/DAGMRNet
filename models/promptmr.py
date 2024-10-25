@@ -153,8 +153,8 @@ class SkipBlock(nn.Module):
 
 class PromptUnet(nn.Module):
     def __init__(self, 
-                 in_chans=10, 
-                 out_chans=10, 
+                 in_chans=2, # 10
+                 out_chans=2, #10 
                  n_feat0=4, # 48
                  feature_dim = [6, 8, 10], # [72, 96, 120]
                  prompt_dim = [2, 4, 6], # [24, 48, 72]
@@ -167,7 +167,7 @@ class PromptUnet(nn.Module):
                  no_use_ca = False,
                  learnable_input_prompt=False,
                  kernel_size=3, 
-                 reduction= 3, # 4
+                 reduction= 4, # 4
                  act=nn.PReLU(), 
                  bias=False,
                  ):
@@ -251,8 +251,8 @@ class PromptUnet(nn.Module):
 class NormSenseUnet(nn.Module):
     def __init__(
         self,
-        in_chans: int = 10,
-        out_chans: int = 10,
+        in_chans: int = 2, # 10
+        out_chans: int = 2, # 10
         n_feat0: int = 48,
         feature_dim: List[int] = [72, 96, 120],
         prompt_dim: List[int] = [24, 48, 72],
@@ -288,10 +288,16 @@ class NormSenseUnet(nn.Module):
             raise ValueError("Last dimension must be 2 for complex.")
 
         # get shapes for unet and normalize
+        #########tensor resize to make train possible
+        # real = x[..., 0]  # Extract real part
+        # imag = x[..., 1]  # Extract imaginary part
+        # real_resized = F.interpolate(real, size=(10, 8), mode='bilinear', align_corners=False)
+        # imag_resized = F.interpolate(imag, size=(10, 8), mode='bilinear', align_corners=False)
+        # x = torch.stack((real_resized, imag_resized), dim=-1)
+        #######################################################
         x = self.complex_to_chan_dim(x)
         x, mean, std = self.norm(x)
         x, pad_sizes = self.pad(x)
-
         x = self.unet(x)
 
         # get shapes back and unnormalize
@@ -336,9 +342,7 @@ class NormSenseUnet(nn.Module):
             w_pad = [math.floor((w_mult - w) / 2), math.ceil((w_mult - w) / 2)]
             h_pad = [math.floor((h_mult - h) / 2), math.ceil((h_mult - h) / 2)]
             # TODO: fix this type when PyTorch fixes theirs
-            # the documentation lies - this actually takes a list
-            # https://github.com/pytorch/pytorch/blob/master/torch/nn/functional.py#L3457
-            # https://github.com/pytorch/pytorch/pull/16949
+
             x = F.pad(x, w_pad + h_pad)
             return x, (h_pad, w_pad, h_mult, w_mult)
 
@@ -352,11 +356,11 @@ class NormSenseUnet(nn.Module):
                 ) -> torch.Tensor:
                     return x[..., h_pad[0]: h_mult - h_pad[1], w_pad[0]: w_mult - w_pad[1]]
     
-class NormPromptUnet(nn.Module):
+class GNNNet(nn.Module):
     def __init__(
         self,
-        in_chans: int = 10,
-        out_chans: int = 10,
+        in_chans: int = 2,
+        out_chans: int = 2,
         n_feat0: int = 4, # it used to be 48
         feature_dim: List[int] = [6, 8, 10], # it used to be [72, 96, 120]
         prompt_dim: List[int] =[2, 4, 6] , # it used to be [24, 48, 72]
@@ -377,10 +381,10 @@ class NormPromptUnet(nn.Module):
             # Ensure dagl_config is not None by setting a default configuration
             dagl_config = {
                 'scale': 2,
-                'n_resblocks': 2, # 32
-                'n_feats': 4, # 64
+                'n_resblocks': 2, # 16
+                'n_feats': 16, # 64
                 'rgb_range': 255,
-                'res_scale': 0.1,
+                'res_scale': 1,
                 'chop': True,
                 'self_ensemble': False,
                 'cpu': False,
@@ -398,18 +402,21 @@ class NormPromptUnet(nn.Module):
         if not x.shape[-1] == 2:
             raise ValueError("Last dimension must be 2 for complex.")
 
-        # get shapes for unet and normalize
+        #########tensor resize to make train possible
+        # real = x[..., 0]  # Extract real part
+        # imag = x[..., 1]  # Extract imaginary part
+        # real_resized = F.interpolate(real, size=(10, 8), mode='bilinear', align_corners=False)
+        # imag_resized = F.interpolate(imag, size=(10, 8), mode='bilinear', align_corners=False)
+        # x = torch.stack((real_resized, imag_resized), dim=-1)
+        #######################################################
         x = self.complex_to_chan_dim(x)
         x, mean, std = self.norm(x)
         # x, pad_sizes = self.pad(x)
-        print("*************************************************")
-        print(x.shape)
-        print(x.type)
-        print("*************************************************")
-
-
-        print("undersampled_image : ",x.shape)
-
+        # print("*************************************************")
+        # print(x.shape)
+        # print(x.type)
+        # print("*************************************************")
+        # print("undersampled_image : ",x.shape)
         # Pass the undersampled image to the DAGL model
         output = self.dagl_model(x)
         print(f"Output shape of dagl_model: {output.shape}")
@@ -532,7 +539,7 @@ class SensitivityModel(nn.Module):
         self,
         in_chans: int = 2,
         out_chans: int = 2,
-        num_adj_slices: int = 1, # 5
+        num_adj_slices: int = 5, # 5
         n_feat0: int = 2, # 24
         feature_dim: List[int] = [3, 4, 5], # [36,48,60]
         prompt_dim: List[int] = [1, 2, 3], # [12,24,36]
@@ -765,7 +772,7 @@ class PromptMR(nn.Module):
         )
         self.cascades = nn.ModuleList(
             [PromptMRBlock
-             (NormPromptUnet
+             (GNNNet
                 (2*num_adj_slices, 2*num_adj_slices, n_feat0, feature_dim, 
                  prompt_dim, len_prompt, prompt_size, n_enc_cab, n_dec_cab, n_skip_cab,
                    n_bottleneck_cab, no_use_ca,dagl_config), 

@@ -3,9 +3,7 @@ import os
 import sys
 import pathlib
 
-from regex import M
 
-from models import DAGL
 sys.path.insert(0, os.path.dirname(os.path.dirname(pathlib.Path(__file__).parent.absolute())))
 
 import argparse
@@ -19,7 +17,7 @@ from torch.utils.data import DataLoader
 
 import fastmri.data.transforms as T
 from models.promptmr import PromptMR
-from models.DAGL import Model
+from models.DAGL import RR
 from utils import crop_submission, load_kdata, loadmat #,rotate_re
 from utils import count_parameters, count_trainable_parameters, count_untrainable_parameters
 # from gshift_deblur1_large_batch import GShiftNet
@@ -86,7 +84,7 @@ class stage1_dataset(torch.utils.data.Dataset):
         return self.num_files
     
 
-def predict(f, num_cascades=12, model_path = '', bs1 = 1, stage=1, center_crop=False, num_works = 2, input_dir='', output_dir=''):
+def predict(f, num_cascades=12, model_path = 'D:/Negar/PromptMR/promptmr_examples/cmrxrecon/checkpoints/', bs1 = 1, stage=1, center_crop=False, num_works = 2, input_dir='', output_dir=''):
     # 0. config
     device = 'cuda:0'
 
@@ -106,25 +104,25 @@ def predict(f, num_cascades=12, model_path = '', bs1 = 1, stage=1, center_crop=F
             
             no_use_ca = False,
     )
-    model2 = Model(
-                scale =  2,
-                n_resblocks = 2, # 32
-                n_feats = 4, # 64
-                rgb_range = 255,
-                res_scale =  0.1,
-                ksize=7,
-                stride_1=1, 
-                stride_2=1, 
-                softmax_scale=10,
-                shape=64 ,
-                p_len=64,
-                in_channels=4, 
-                inter_channels=2,
-                num_edge = 50,
-        
-
+    model2 = RR(
+                args = {
+                'scale': 2,
+                'n_resblocks': 16, # 16
+                'n_feats': 64, # 64
+                'rgb_range': 255,
+                'res_scale': 1,
+                'chop': True,
+                'self_ensemble': False,
+                'cpu': False,
+                'n_GPUs': 1,
+                'save_models': False,
+                'pre_train': '',
+                'resume': 0,
+                'seed': 42,
+                'print_model': False,
+            }
     )
-    print(f'stage1 model:\ntotal param: {count_parameters(model1 , model2)}\ntrainable param: {count_trainable_parameters(model1 , model2)}\nuntrainable param: {count_untrainable_parameters(model1)}\n##############')
+    print(f'stage1 model:\ntotal param: {count_parameters(model1 , model2)}\ntrainable param: {count_trainable_parameters(model1 , model2)}\nuntrainable param: {count_untrainable_parameters(model1, model2)}\n##############')
     state_dict = torch.load(model_path)['state_dict']
     state_dict.pop('loss.w')
     state_dict = {k.replace('promptmr.', ''): v for k, v in state_dict.items()}
@@ -174,7 +172,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--input', type=str, nargs='?', default='/input', help='input directory')
     parser.add_argument('--output', type=str, nargs='?', default='/output', help='output directory')
-    parser.add_argument('--model_path', type=str, nargs='?', default='/model', help='model path')
+    parser.add_argument('--model_path', type=str, nargs='?', default='D:/Paper/codes/PromptMR/promptmr_examples/cmrxrecon/checkpoints/', help='model path')
     parser.add_argument('--center_crop', action='store_true', default=False, help='Enable center cropping for validation leaderboard submission')
     parser.add_argument('--stage', type=int, default=1, choices=[1, 2], help='Choose the stage: 1 or 2. Currently only stage 1 is released, since the second stage only provides marginal SSIM improvement to our PromptMR model.')
     parser.add_argument('--evaluate_set', type=str, choices=["ValidationSet", "TestSet"], help='Choose the evaluation set: ValidationSet or TestSet')
