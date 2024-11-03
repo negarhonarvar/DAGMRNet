@@ -1,0 +1,174 @@
+T1 :0
+T2 :0
+LAX :72
+SAX :24
+LVOT :24
+AORTA_SAG :0
+AORTA_TRA :0
+TAGGING :0
+Sanity Checking: 0it [00:00, ?it/s]Sanity Checking:   0%|                                                                               | 0/2 [00:00<?, ?it/s]Sanity Checking DataLoader 0:   0%|                                                                  | 0/2 [00:00<?, ?it/s]**************************************Cascade PromptMRBlock(
+  (model): DAGMRNet(
+    (dagl_model): RR(
+      (head): Sequential(
+        (0): Conv2d(2, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+      )
+      (body): Sequential(
+        (0): ResBlock(
+          (body): Sequential(
+            (0): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+            (1): PReLU(num_parameters=1)
+            (2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          )
+        )
+        (1): ResBlock(
+          (body): Sequential(
+            (0): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+            (1): PReLU(num_parameters=1)
+            (2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          )
+        )
+        (2): CES(
+          (RBS1): Sequential(
+            (0): ResBlock(
+              (body): Sequential(
+                (0): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+                (1): PReLU(num_parameters=1)
+                (2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+              )
+            )
+            (1): ResBlock(
+              (body): Sequential(
+                (0): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+                (1): PReLU(num_parameters=1)
+                (2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+              )
+            )
+            (2): ResBlock(
+              (body): Sequential(
+                (0): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+                (1): PReLU(num_parameters=1)
+                (2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+              )
+            )
+            (3): ResBlock(
+              (body): Sequential(
+                (0): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+                (1): PReLU(num_parameters=1)
+                (2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+              )
+            )
+          )
+          (RBS2): Sequential(
+            (0): ResBlock(
+              (body): Sequential(
+                (0): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+                (1): PReLU(num_parameters=1)
+                (2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+              )
+            )
+            (1): ResBlock(
+              (body): Sequential(
+                (0): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+                (1): PReLU(num_parameters=1)
+                (2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+              )
+            )
+            (2): ResBlock(
+              (body): Sequential(
+                (0): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+                (1): PReLU(num_parameters=1)
+                (2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+              )
+            )
+            (3): ResBlock(
+              (body): Sequential(
+                (0): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+                (1): PReLU(num_parameters=1)
+                (2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+              )
+            )
+          )
+          (c1_1): CE(
+            (g): Conv2d(64, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+            (W): Conv2d(16, 64, kernel_size=(1, 1), stride=(1, 1))
+            (theta): Conv2d(64, 16, kernel_size=(1, 1), stride=(1, 1))
+            (fc1): Sequential(
+              (0): Linear(in_features=784, out_features=196, bias=True)
+              (1): ReLU()
+            )
+            (fc2): Sequential(
+              (0): Linear(in_features=784, out_features=196, bias=True)
+              (1): ReLU()
+            )
+            (thr_conv): Conv2d(64, 1, kernel_size=(7, 7), stride=(4, 4))
+            (bias_conv): Conv2d(64, 1, kernel_size=(7, 7), stride=(4, 4))
+          )
+          (c1_2): CE(
+            (g): Conv2d(64, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+            (W): Conv2d(16, 64, kernel_size=(1, 1), stride=(1, 1))
+            (theta): Conv2d(64, 16, kernel_size=(1, 1), stride=(1, 1))
+            (fc1): Sequential(
+              (0): Linear(in_features=784, out_features=196, bias=True)
+              (1): ReLU()
+            )
+            (fc2): Sequential(
+              (0): Linear(in_features=784, out_features=196, bias=True)
+              (1): ReLU()
+            )
+            (thr_conv): Conv2d(64, 1, kernel_size=(7, 7), stride=(4, 4))
+            (bias_conv): Conv2d(64, 1, kernel_size=(7, 7), stride=(4, 4))
+          )
+          (c1_3): CE(
+            (g): Conv2d(64, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+            (W): Conv2d(16, 64, kernel_size=(1, 1), stride=(1, 1))
+            (theta): Conv2d(64, 16, kernel_size=(1, 1), stride=(1, 1))
+            (fc1): Sequential(
+              (0): Linear(in_features=784, out_features=196, bias=True)
+              (1): ReLU()
+            )
+            (fc2): Sequential(
+              (0): Linear(in_features=784, out_features=196, bias=True)
+              (1): ReLU()
+            )
+            (thr_conv): Conv2d(64, 1, kernel_size=(7, 7), stride=(4, 4))
+            (bias_conv): Conv2d(64, 1, kernel_size=(7, 7), stride=(4, 4))
+          )
+          (c1_4): CE(
+            (g): Conv2d(64, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+            (W): Conv2d(16, 64, kernel_size=(1, 1), stride=(1, 1))
+            (theta): Conv2d(64, 16, kernel_size=(1, 1), stride=(1, 1))
+            (fc1): Sequential(
+              (0): Linear(in_features=784, out_features=196, bias=True)
+              (1): ReLU()
+            )
+            (fc2): Sequential(
+              (0): Linear(in_features=784, out_features=196, bias=True)
+              (1): ReLU()
+            )
+            (thr_conv): Conv2d(64, 1, kernel_size=(7, 7), stride=(4, 4))
+            (bias_conv): Conv2d(64, 1, kernel_size=(7, 7), stride=(4, 4))
+          )
+          (c1_c): Conv2d(64, 64, kernel_size=(1, 1), stride=(1, 1))
+        )
+        (3): ResBlock(
+          (body): Sequential(
+            (0): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+            (1): PReLU(num_parameters=1)
+            (2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          )
+        )
+        (4): ResBlock(
+          (body): Sequential(
+            (0): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+            (1): PReLU(num_parameters=1)
+            (2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          )
+        )
+        (5): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+      )
+      (tail): Sequential(
+        (0): Conv2d(64, 2, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+      )
+    )
+  )
+)  started**********************************************
