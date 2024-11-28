@@ -1,2 +1,2 @@
 # DAGMRNet: Attentive Graph Learning with Dynamic Neighbor Selection for MR Image Reconstruction 
-This repository contains a comprehensive model to reconstruct cardiac mri images in k-space from CMRxRecon dataset.
+This repository contains a comprehensive model to reconstruct cardiac MRI in k-space from CMRxRecon dataset. In this model we have advanced a graph neural network well-equipped with dynamic attention mechanism which selects neighbors based on their similarity to target node to update the target node relatively.
