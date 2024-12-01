@@ -6,3 +6,5 @@ The model implies a cascaded architecture for optimization and effiency.
 <p align="center">
   <img src="https://github.com/user-attachments/assets/e8f62112-b7bb-42f5-a000-65b4afb1d981" width = "400">
 </p>
+The model levrages PromptUnet as described in PromptMr paper for sensitivity map estimation:
+![image](https://github.com/user-attachments/assets/6f493f9b-6d70-4ce6-bbf2-ff8f17428056)
