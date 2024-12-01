@@ -14,4 +14,7 @@ The model levrages PromptUnet as described in PromptMr paper for sensitivity map
   <img src="https://github.com/user-attachments/assets/6f493f9b-6d70-4ce6-bbf2-ff8f17428056" width = "400">
 </p>
 
-In each cascade, a denoising network is employed to reconstruct the highly-undersampled cardiac MR images:
+In each cascade, a denoising network is employed to reconstruct the highly-undersampled cardiac MR images, an abstract of each cascade structer is shown bellow:
+
+![image](https://github.com/user-attachments/assets/dc832d13-eef8-403a-8cc8-26d357fe63ab)
+
