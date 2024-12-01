@@ -3,4 +3,6 @@ This repository contains a comprehensive model to reconstruct cardiac MRI in k-s
 
 ## Architecture
 The model implies a cascaded architecture for optimization and effiency.
-<img source="https://github.com/user-attachments/assets/e8f62112-b7bb-42f5-a000-65b4afb1d981" width = "400">
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/e8f62112-b7bb-42f5-a000-65b4afb1d981" width = "400">
+</p>
