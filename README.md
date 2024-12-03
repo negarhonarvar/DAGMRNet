@@ -9,6 +9,7 @@ The model implies a cascaded architecture for optimization and effiency. in each
 </p>
 
 ACS stands for Automated Calibration Signal which refers to parts of each image in k-space that are fully sampled and are used to estimate the sensitivity maps.
+Inverse fourier transform is used to transform k-space signals to image domain.
 
 The model levrages PromptUnet as described in PromptMr paper for sensitivity map estimation:
 
