@@ -8,6 +8,8 @@ The model implies a cascaded architecture for optimization and effiency. in each
   <img src="https://github.com/user-attachments/assets/e8f62112-b7bb-42f5-a000-65b4afb1d981" width = "400">
 </p>
 
+ACS stands for Automated Calibration Signal which refers to parts of each image in k-space that are fully sampled and are used to estimate the sensitivity maps.
+
 The model levrages PromptUnet as described in PromptMr paper for sensitivity map estimation:
 
 <p align="center">
