@@ -18,7 +18,7 @@ import fastmri.data.transforms as T
 
 from models.Model import DAGMR
 from pl_modules.fastmri_data_module import FastmriKneeSliceDataset
-from data.transforms import FastmriKneePromptMrDataTransform
+from data.transforms import FastmriKneeDAGMRNetDataTransform
 
 
 
@@ -129,7 +129,7 @@ def run_inference(challenge, state_dict_file, data_path, output_path, device):
     model = model.eval()
 
     # data loader setup
-    data_transform = FastmriKneePromptMrDataTransform()
+    data_transform = FastmriKneeDAGMRNetDataTransform()
     dataset = FastmriKneeSliceDataset(
         root=data_path, transform=data_transform, challenge="multicoil"
     )

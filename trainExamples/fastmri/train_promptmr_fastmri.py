@@ -6,9 +6,9 @@ from argparse import ArgumentParser
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(pathlib.Path(__file__).parent.absolute())))
 
-from data.transforms import FastmriKneePromptMrDataTransform
+from data.transforms import FastmriKneeDAGMRNetDataTransform
 from pl_modules.fastmri_data_module import FastmriKneeDataModule
-from pl_modules.promptmr_module import DAGMRNetModule
+from pl_modules.DAGMRNet_module import DAGMRNetModule
 from data.subsample import create_mask_for_mask_type
 import pytorch_lightning as pl
 
@@ -25,9 +25,9 @@ def cli_main(args):
         args.mask_type, args.center_fractions, args.accelerations
     )
     # use random masks for train transform, fixed masks for val transform
-    train_transform = FastmriKneePromptMrDataTransform(mask_func=mask, use_seed=False)
-    val_transform = FastmriKneePromptMrDataTransform(mask_func=mask)
-    test_transform = FastmriKneePromptMrDataTransform()
+    train_transform = FastmriKneeDAGMRNetDataTransform(mask_func=mask, use_seed=False)
+    val_transform = FastmriKneeDAGMRNetDataTransform(mask_func=mask)
+    test_transform = FastmriKneeDAGMRNetDataTransform()
     # ptl data module - this handles data loaders
     data_module = FastmriKneeDataModule(
         data_path=args.data_path,

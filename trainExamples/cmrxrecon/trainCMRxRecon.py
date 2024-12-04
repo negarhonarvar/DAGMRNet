@@ -5,9 +5,9 @@ from argparse import ArgumentParser
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(pathlib.Path(__file__).parent.absolute())))
 
-from data.transforms import PromptMrDataTransform
+from data.transforms import DAGMRNetDataTransform
 from pl_modules.cmrxrecon_data_module import CmrxReconDataModule
-from pl_modules.promptmr_module import DAGMRNetModule
+from pl_modules.DAGMRNet_module import DAGMRNetModule
 from data.subsample import create_mask_for_mask_type
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger
@@ -29,9 +29,9 @@ def cli_main(args):
         args.mask_type, None, args.accelerations, args.center_numbers
     )
     # use equispaced_fixed masks for train transform, fixed masks for val transform
-    train_transform = PromptMrDataTransform(mask_func=mask, use_seed=False)
-    val_transform = PromptMrDataTransform(mask_func=mask)
-    test_transform = PromptMrDataTransform()
+    train_transform = DAGMRNetDataTransform(mask_func=mask, use_seed=False)
+    val_transform = DAGMRNetDataTransform(mask_func=mask)
+    test_transform = DAGMRNetDataTransform()
     # ptl data module - this handles data loaders
     data_module = CmrxReconDataModule(
         data_path=args.data_path,

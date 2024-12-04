@@ -62,7 +62,7 @@ def apply_mask(
 
     return masked_data, mask, num_low_frequencies
 
-class PromptMRSample(NamedTuple):
+class DAGMRNetSample(NamedTuple):
     """
     A sample of masked k-space for variational network reconstruction.
 
@@ -88,7 +88,7 @@ class PromptMRSample(NamedTuple):
     crop_size: Tuple[int, int]
 
 
-class PromptMrDataTransform:
+class DAGMRNetDataTransform:
     """
     Data Transformer for training VarNet models.
     """
@@ -149,7 +149,7 @@ class PromptMrDataTransform:
                 kspace_torch, self.mask_func, seed=seed, padding=(acq_start, acq_end)
             )
 
-            sample = PromptMRSample(
+            sample = DAGMRNetSample(
                 masked_kspace=masked_kspace,
                 mask=mask_torch.to(torch.bool),
                 num_low_frequencies=num_low_frequencies,
@@ -172,7 +172,7 @@ class PromptMrDataTransform:
             mask_torch[:, :, :acq_start] = 0
             mask_torch[:, :, acq_end:] = 0
 
-            sample = PromptMRSample(
+            sample = DAGMRNetSample(
                 masked_kspace=masked_kspace,
                 mask=mask_torch.to(torch.bool),
                 num_low_frequencies=0,
@@ -186,7 +186,7 @@ class PromptMrDataTransform:
 
         return sample
     
-class FastmriKneePromptMrDataTransform:
+class FastmriKneeDAGMRNetDataTransform:
     """
     Data Transformer for training VarNet models.
     """
@@ -253,7 +253,7 @@ class FastmriKneePromptMrDataTransform:
         attrs: Dict,
         fname: str,
         slice_num: int,
-    ) -> PromptMRSample:
+    ) -> DAGMRNetSample:
         """
         Args:
             kspace: Input k-space of shape (num_coils, rows, cols) for
@@ -304,7 +304,7 @@ class FastmriKneePromptMrDataTransform:
                 kspace_torch, self.mask_func, seed=seed, padding=(acq_start, acq_end)
             )
 
-            sample = PromptMRSample(
+            sample = DAGMRNetSample(
                 masked_kspace=masked_kspace,
                 mask=mask_torch.to(torch.bool),
                 num_low_frequencies=num_low_frequencies,
@@ -326,7 +326,7 @@ class FastmriKneePromptMrDataTransform:
             mask_torch[:, :, :acq_start] = 0
             mask_torch[:, :, acq_end:] = 0
 
-            sample = PromptMRSample(
+            sample = DAGMRNetSample(
                 masked_kspace=masked_kspace,
                 mask=mask_torch.to(torch.bool),
                 num_low_frequencies=0,
