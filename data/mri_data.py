@@ -221,27 +221,25 @@ class CmrxReconSliceDataset(torch.utils.data.Dataset):
                 files += list(folders[i].iterdir())
 
             # # Mapping = T1 - T2 
-            # folders = list(Path(str(root).replace('Cine','Mapping')).iterdir())
-            # files2 = []
-            # for i in range(len(folders)):
-            #     files2 += list(folders[i].iterdir())
+            folders = list(Path(str(root).replace('Cine','Mapping')).iterdir())
+            files2 = []
+            for i in range(len(folders)):
+                 files2 += list(folders[i].iterdir())
 
-            # # Aorta = SAG - TRA 
-            # folders = list(Path(str(root).replace('Cine','Aorta')).iterdir())
-            # files3 = []
-            # for i in range(len(folders)):
-            #     files3 += list(folders[i].iterdir())
+            # Aorta = SAG - TRA 
+            folders = list(Path(str(root).replace('Cine','Aorta')).iterdir())
+            files3 = []
+            for i in range(len(folders)):
+                files3 += list(folders[i].iterdir())
 
-            # # Tagging = Tagging
-            # folders = list(Path(str(root).replace('Cine','Tagging')).iterdir())
-            # files4 = []
-            # for i in range(len(folders)):
-            #     files4 += list(folders[i].iterdir())
+            # Tagging = Tagging
+            folders = list(Path(str(root).replace('Cine','Tagging')).iterdir())
+            files4 = []
+            for i in range(len(folders)):
+                files4 += list(folders[i].iterdir())
 
 
-            # files = sorted(files+files2+files3+files4)
-            files = sorted(files)
-            # files = sorted(files)
+            files = sorted(files+files2+files3+files4)
 
             for fname in sorted(files): 
                 with h5py.File(fname,'r') as hf:

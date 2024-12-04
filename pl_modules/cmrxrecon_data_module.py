@@ -163,9 +163,9 @@ class CmrxReconDataModule(pl.LightningDataModule):
         # self.data_path = data_path / 'Cine' / 'TrainingSet' / h5py_folder 
         print("data_path:", data_path)
         print("'Cine':", 'Cine')
-        print("'TrainingSet':", 'TrainingSet')
+        # print("'TrainingSet':", 'TrainingSet')
         print("h5py_folder:", h5py_folder)
-        self.data_path = data_path.joinpath('Cine', 'TrainingSet', h5py_folder)
+        self.data_path = data_path.joinpath('Cine', h5py_folder)
 
         self.challenge = challenge
         self.train_transform = train_transform

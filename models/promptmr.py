@@ -1,9 +1,3 @@
-'''
-Author: Bingyu Xin
-Affiliation: Computer Science department, Rutgers University, NJ, USA
-Paper: https://arxiv.org/abs/2309.13839
-Date: 2023-10-15
-'''
 
 from ast import Dict
 from models.DAGL import RR
@@ -376,8 +370,8 @@ class DAGMRNet(nn.Module):
         if dagl_config is None:
             dagl_config = {
                 'scale': 2,
-                'n_resblocks': 4, # 16
-                'n_feats': 16, # 64
+                'n_resblocks': 12, # 16
+                'n_feats': 48, # 64
                 'rgb_range': 255,
                 'res_scale': 1,
                 'chop': True,
@@ -622,15 +616,11 @@ class SensitivityModel(nn.Module):
 
 
 class PromptMR(nn.Module):
-    """
-    An prompt-learning based unrolled model for multi-coil MR reconstruction, 
-    see https://arxiv.org/abs/2309.13839.
 
-    """
 
     def __init__(
         self,
-        num_cascades: int = 1, # 12
+        num_cascades: int = 8, # 12
         num_adj_slices: int = 1, # 5
         n_feat0: int = 48, # 48
         feature_dim: List[int] = [72, 96, 120], # [72,96,120]
@@ -702,6 +692,8 @@ class PromptMR(nn.Module):
             low_mem=low_mem,
 
         )
+        num_cascades = 8
+        print("Number of cascades : ",num_cascades)
         self.cascades = nn.ModuleList(
             [PromptMRBlock(DAGMRNet(2*num_adj_slices, 2*num_adj_slices, n_feat0, feature_dim, prompt_dim, len_prompt, prompt_size, n_enc_cab, n_dec_cab, n_skip_cab, n_bottleneck_cab, no_use_ca), num_adj_slices) for _ in range(num_cascades)]
         )

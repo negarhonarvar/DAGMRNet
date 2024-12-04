@@ -2,8 +2,8 @@ dagl_config:
   chop: true
   cpu: false
   n_GPUs: 1
-  n_feats: 16
-  n_resblocks: 2
+  n_feats: 64
+  n_resblocks: 16
   pre_train: ''
   print_model: false
   res_scale: 1.0
@@ -14,9 +14,9 @@ dagl_config:
   seed: 42
   self_ensemble: false
 feature_dim:
-- 6
-- 8
-- 10
+- 72
+- 96
+- 120
 len_prompt:
 - 5
 - 5
@@ -43,21 +43,21 @@ no_use_ca: false
 num_adj_slices: 1
 num_cascades: 2
 prompt_dim:
-- 2
-- 4
-- 6
+- 24
+- 48
+- 72
 prompt_size:
+- 64
+- 32
 - 16
-- 8
-- 4
 sens_feature_dim:
-- 3
-- 4
-- 5
+- 36
+- 48
+- 60
 sens_n_feat0: 2
 sens_prompt_dim:
-- 1
-- 2
-- 3
+- 12
+- 24
+- 36
 use_checkpoint: false
 weight_decay: 0.01

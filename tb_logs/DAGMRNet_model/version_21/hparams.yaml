@@ -34,14 +34,14 @@ n_enc_cab:
 - 1
 - 1
 - 1
-n_feat0: 4
+n_feat0: 48
 n_skip_cab:
 - 1
 - 1
 - 1
 no_use_ca: false
 num_adj_slices: 1
-num_cascades: 1
+num_cascades: 8
 prompt_dim:
 - 24
 - 48

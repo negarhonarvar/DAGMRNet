@@ -1,10 +1,3 @@
-'''
-Author: Bingyu Xin
-Affiliation: Computer Science department, Rutgers University, NJ, USA
-Paper: https://arxiv.org/abs/2309.13839
-Date: 2023-10-15
-'''
-
 from argparse import ArgumentParser
 
 import fastmri
@@ -20,9 +13,7 @@ from skimage.metrics import peak_signal_noise_ratio as psnr
 
 class PromptMrModule(MriModule):
     """
-    PromptMR training module.
-
-    Paper: https://arxiv.org/abs/2309.13839
+    Training module.
 
     """
 
@@ -281,7 +272,7 @@ class PromptMrModule(MriModule):
         # network params
         parser.add_argument(
             "--num_cascades",
-            default=2, # default = 12
+            default=1, # default = 12
             type=int,
             help="Number of PromptMR cascades",
         )
