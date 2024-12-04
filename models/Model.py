@@ -1,6 +1,6 @@
 
 from ast import Dict
-from models.DAGL import RR
+from models.DAGMRNet import DAGMR
 import torch
 import torch.nn as nn
 import fastmri
@@ -243,7 +243,7 @@ class PromptUnet(nn.Module):
         return self.conv_last(x)
 
 
-class NormPromptUnet(nn.Module):
+class SME(nn.Module):
     def __init__(
         self,
         in_chans: int = 10,
@@ -385,7 +385,7 @@ class DAGMRNet(nn.Module):
                 'print_model': False,
             }
 
-        self.dagl_model = RR(dagl_config)
+        self.dagl_model = DAGMR(dagl_config)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if not x.shape[-1] == 2:
@@ -526,18 +526,18 @@ class SensitivityModel(nn.Module):
         self.mask_center = mask_center
         self.num_adj_slices = num_adj_slices
         self.low_mem = low_mem
-        self.norm_unet = NormPromptUnet(in_chans=in_chans,
-                                out_chans = out_chans,
-                                n_feat0=n_feat0,
-                                feature_dim = feature_dim,
-                                prompt_dim = prompt_dim,
-                                len_prompt = len_prompt,
-                                prompt_size = prompt_size,
-                                n_enc_cab = n_enc_cab,
-                                n_dec_cab = n_dec_cab,
-                                n_skip_cab = n_skip_cab,
-                                n_bottleneck_cab = n_bottleneck_cab,
-                                no_use_ca = no_use_ca)
+        self.norm_unet = SME(in_chans=in_chans,
+                             out_chans = out_chans,
+                             n_feat0=n_feat0,
+                             feature_dim = feature_dim,
+                             prompt_dim = prompt_dim,
+                             len_prompt = len_prompt,
+                             prompt_size = prompt_size,
+                             n_enc_cab = n_enc_cab,
+                             n_dec_cab = n_dec_cab,
+                             n_skip_cab = n_skip_cab,
+                             n_bottleneck_cab = n_bottleneck_cab,
+                             no_use_ca = no_use_ca)
 
     def chans_to_batch_dim(self, x: torch.Tensor) -> Tuple[torch.Tensor, int]:
         b, c, h, w, comp = x.shape
@@ -615,7 +615,7 @@ class SensitivityModel(nn.Module):
         )
 
 
-class PromptMR(nn.Module):
+class DAGMR(nn.Module):
 
 
     def __init__(

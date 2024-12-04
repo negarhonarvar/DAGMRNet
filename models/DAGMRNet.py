@@ -11,20 +11,12 @@ from models.Utilities import test_x8
 import torch.utils.checkpoint as checkpoint
 
 #########################################################################
-# -------------------------------  DAGL ----------------------------------
+# -------------------------------  DAGMRNET ----------------------------------
 
 def default_conv(in_channels, out_channels, kernel_size = 3, stride=1, bias=True):
     return nn.Conv2d(
         in_channels, out_channels, kernel_size,
         padding=(kernel_size // 2), stride=stride, bias=bias)
-
-
-# class MeanShift(nn.Conv2d):
-#     def __init__(
-#         self, in_channels, rgb_range, sign=-1):
-#         super(MeanShift, self).__init__(in_channels, in_channels, kernel_size=1)
-#         for p in self.parameters():
-#             p.requires_grad = False
 
 
 class ResBlock(nn.Module):
@@ -72,7 +64,7 @@ def same_padding(images, ksizes, strides, rates):
     return images, paddings
 
 
-def extract_image_patches(images, ksizes, strides, rates, padding='same'):
+def ExtractImagePatches(images, ksizes, strides, rates, padding='same'):
     """
     Extract patches from images and put them in the C output dimension.
     :param padding:
@@ -105,10 +97,10 @@ def extract_image_patches(images, ksizes, strides, rates, padding='same'):
 """
 Graph model
 """
-class CE(nn.Module):
+class DynamicAttentionMechanism(nn.Module):
     def __init__(self, ksize=7, stride_1=4, stride_2=1, softmax_scale=10,shape=64 ,p_len=64,in_channels=64
                  , inter_channels=16,use_multiple_size=False,use_topk=False,add_SE=False,num_edge = 50):
-        super(CE, self).__init__()
+        super(DynamicAttentionMechanism, self).__init__()
         self.ksize = ksize
         self.shape=shape
         self.p_len=p_len
@@ -160,29 +152,29 @@ class CE(nn.Module):
         soft_bias = self.bias_conv(b4).view(raw_int_bs[0],-1)
 
         # extracts patches from b1
-        patch_28, paddings_28 = extract_image_patches(b1, ksizes=[self.ksize, self.ksize],
-                                                      strides=[self.stride_1, self.stride_1],
-                                                      rates=[1, 1],
-                                                      padding='same')
+        patch_28, paddings_28 = ExtractImagePatches(b1, ksizes=[self.ksize, self.ksize],
+                                                    strides=[self.stride_1, self.stride_1],
+                                                    rates=[1, 1],
+                                                    padding='same')
         patch_28 = patch_28.view(raw_int_bs[0], raw_int_bs[1], self.ksize, self.ksize, -1)
         patch_28 = patch_28.permute(0, 4, 1, 2, 3)
         patch_28_group = torch.split(patch_28, 1, dim=0)
 
         # Similar to patch_28, patches are extracted from b2 but using different stride parameters
-        patch_112, paddings_112 = extract_image_patches(b2, ksizes=[self.ksize, self.ksize],
-                                                        strides=[self.stride_2, self.stride_2],
-                                                        rates=[1, 1],
-                                                        padding='same')
+        patch_112, paddings_112 = ExtractImagePatches(b2, ksizes=[self.ksize, self.ksize],
+                                                      strides=[self.stride_2, self.stride_2],
+                                                      rates=[1, 1],
+                                                      padding='same')
 
         patch_112 = patch_112.view(raw_int_bs[0], raw_int_bs[1], self.ksize, self.ksize, -1)
         patch_112 = patch_112.permute(0, 4, 1, 2, 3)
         patch_112_group = torch.split(patch_112, 1, dim=0)
 
         # patches are again extracted from b3 using similar settings as for b2
-        patch_112_2, paddings_112_2 = extract_image_patches(b3, ksizes=[self.ksize, self.ksize],
-                                                        strides=[self.stride_2, self.stride_2],
-                                                        rates=[1, 1],
-                                                        padding='same')
+        patch_112_2, paddings_112_2 = ExtractImagePatches(b3, ksizes=[self.ksize, self.ksize],
+                                                          strides=[self.stride_2, self.stride_2],
+                                                          rates=[1, 1],
+                                                          padding='same')
 
         patch_112_2 = patch_112_2.view(raw_int_bs[0], raw_int_bs[1], self.ksize, self.ksize, -1)
         patch_112_2 = patch_112_2.permute(0, 4, 1, 2, 3)
@@ -219,9 +211,9 @@ class CE(nn.Module):
         return y
 
 
-class CES(nn.Module):
+class M_GFAM(nn.Module):
     def __init__(self, in_channels, num=4):
-        super(CES, self).__init__()
+        super(M_GFAM, self).__init__()
         RBS1 = [ResBlock(default_conv, n_feats=in_channels, kernel_size=3, act=nn.PReLU(), res_scale=1
                          ) for _ in range(num)]
         self.RBS1 = nn.Sequential(*RBS1)
@@ -231,23 +223,23 @@ class CES(nn.Module):
 
         # stage 1 (3 heads)
         print("in_channels in CES :" , in_channels)
-        self.c1_1 = CE(in_channels=in_channels)
-        self.c1_2 = CE(in_channels=in_channels)
-        self.c1_3 = CE(in_channels=in_channels)
+        self.c1_1 = DynamicAttentionMechanism(in_channels=in_channels)
+        self.c1_2 = DynamicAttentionMechanism(in_channels=in_channels)
+        self.c1_3 = DynamicAttentionMechanism(in_channels=in_channels)
         # self.c1_4 = CE(in_channels=in_channels)
         self.c1_c = nn.Conv2d(in_channels, in_channels, 1, 1, 0)
 
         # stage 2 (3 heads)
-        self.c2_1 = CE(in_channels=in_channels)
-        self.c2_2 = CE(in_channels=in_channels)
-        self.c2_3 = CE(in_channels=in_channels)
+        self.c2_1 = DynamicAttentionMechanism(in_channels=in_channels)
+        self.c2_2 = DynamicAttentionMechanism(in_channels=in_channels)
+        self.c2_3 = DynamicAttentionMechanism(in_channels=in_channels)
         # # self.c2_4 = CE(in_channels=in_channels)
         self.c2_c = nn.Conv2d(in_channels, in_channels, 1, 1, 0)
 
         # stage 3 (3 heads)
-        self.c3_1 = CE(in_channels=in_channels)
-        self.c3_2 = CE(in_channels=in_channels)
-        self.c3_3 = CE(in_channels=in_channels)
+        self.c3_1 = DynamicAttentionMechanism(in_channels=in_channels)
+        self.c3_2 = DynamicAttentionMechanism(in_channels=in_channels)
+        self.c3_3 = DynamicAttentionMechanism(in_channels=in_channels)
         # # self.c3_4 = CE(in_channels=in_channels)
         self.c3_c = nn.Conv2d(in_channels, in_channels, 1, 1, 0)
 
@@ -267,9 +259,9 @@ class CES(nn.Module):
         return out
 
 
-class RR(nn.Module):
+class DAGMR(nn.Module):
     def __init__(self, args, conv=default_conv):
-        super(RR, self).__init__()
+        super(DAGMR, self).__init__()
         # Define basic settings for grayscale input
         n_resblocks = args['n_resblocks']
         n_feats = args['n_feats']
@@ -284,7 +276,7 @@ class RR(nn.Module):
             ResBlock(conv, n_feats, kernel_size, res_scale=res_scale
                      )for _ in range(n_resblocks // 2)
         ]
-        m_body.append(CES(n_feats))
+        m_body.append(M_GFAM(n_feats))
         for i in range(n_resblocks // 2):
             m_body.append(ResBlock(conv, n_feats, kernel_size, res_scale=res_scale))
 
@@ -329,11 +321,11 @@ class RR(nn.Module):
                                    .format(name))
 
 def make_model(args, parent=False):
-    return RR(args)
+    return DAGMR(args)
 
-class Model(nn.Module):
+class ReconModel(nn.Module):
     def __init__(self, args, ckp):
-        super(Model, self).__init__()
+        super(ReconModel, self).__init__()
         print('Building GNN model for grayscale images...')
         self.scale = args.scale
         self.idx_scale = 0
@@ -394,9 +386,6 @@ class Model(nn.Module):
         scale = self.scale[self.idx_scale]
         n_GPUs = min(self.n_GPUs, 4)
         b, c, h, w = x.size()
-        #############################################
-        # adaptive shave
-        # corresponding to scaling factor of the downscali/home/ubuntu/Documents/MC/RNAN_V2/DN_Gray/code/DIV2K/Val/DIV2K_HQng and upscaling modules in the network
         shave_scale = 4
         # max shave size
         shave_size_max = 24

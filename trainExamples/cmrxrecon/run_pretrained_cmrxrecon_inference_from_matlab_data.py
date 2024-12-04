@@ -14,7 +14,7 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader
 
 import fastmri.data.transforms as T
-from models.promptmr import PromptMR
+from models.Model import DAGMR
 from utils import crop_submission, load_kdata, loadmat #,rotate_re
 from utils import count_parameters, count_trainable_parameters, count_untrainable_parameters
 # from gshift_deblur1_large_batch import GShiftNet
@@ -87,7 +87,7 @@ def predict(f, num_cascades=12, model_path = '', bs1 = 1, stage=1, center_crop=F
 
     # 1. load model
     ## stage 1
-    model1 = PromptMR(            
+    model1 = DAGMR(
             num_cascades=num_cascades,  # number of unrolled iterations
             num_adj_slices=5,  # number of adjacent slices
 

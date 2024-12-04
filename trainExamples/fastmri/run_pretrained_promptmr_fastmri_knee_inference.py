@@ -16,7 +16,7 @@ from pathlib import Path
 import fastmri
 import fastmri.data.transforms as T
 
-from models.promptmr import PromptMR
+from models.Model import DAGMR
 from pl_modules.fastmri_data_module import FastmriKneeSliceDataset
 from data.transforms import FastmriKneePromptMrDataTransform
 
@@ -81,7 +81,7 @@ def count_untrainable_parameters(model):
 
 def run_inference(challenge, state_dict_file, data_path, output_path, device):
     # model = VarNet(num_cascades=12, pools=4, chans=18, sens_pools=4, sens_chans=8)
-    model = PromptMR(            
+    model = DAGMR(
             num_cascades=12,  # number of unrolled iterations
             num_adj_slices=3,  # number of adjacent slices
 
