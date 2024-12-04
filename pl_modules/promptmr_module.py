@@ -11,7 +11,7 @@ from skimage.metrics import peak_signal_noise_ratio as psnr
 
 
 
-class PromptMrModule(MriModule):
+class DAGMRNetModule(MriModule):
     """
     Training module.
 

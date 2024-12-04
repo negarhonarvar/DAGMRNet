@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(pathlib.Path(__file__).parent
 
 from data.transforms import FastmriKneePromptMrDataTransform
 from pl_modules.fastmri_data_module import FastmriKneeDataModule
-from pl_modules.promptmr_module import PromptMrModule
+from pl_modules.promptmr_module import DAGMRNetModule
 from data.subsample import create_mask_for_mask_type
 import pytorch_lightning as pl
 
@@ -48,7 +48,7 @@ def cli_main(args):
     # ------------
     # model
     # ------------
-    model = PromptMrModule(
+    model = DAGMRNetModule(
         num_cascades=args.num_cascades,
         num_adj_slices=args.num_adj_slices,
         n_feat0=args.n_feat0,
@@ -161,7 +161,7 @@ def build_args():
     )
 
     # module config
-    parser = PromptMrModule.add_model_specific_args(parser)
+    parser = DAGMRNetModule.add_model_specific_args(parser)
     parser.set_defaults(
         num_cascades=12,  # number of unrolled iterations
         num_adj_slices=3,  # number of adjacent slices
