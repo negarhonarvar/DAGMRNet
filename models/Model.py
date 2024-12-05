@@ -1,6 +1,6 @@
 
 from ast import Dict
-from models.DAGMRNet import DAGMR
+from models.DAGMRModel import DAGMR
 import torch
 import torch.nn as nn
 import fastmri
@@ -615,7 +615,7 @@ class SensitivityModel(nn.Module):
         )
 
 
-class DAGMR(nn.Module):
+class DAGMRNetworkModel(nn.Module):
 
 
     def __init__(

@@ -4,7 +4,7 @@ import fastmri
 import torch
 from fastmri.data import transforms
 from fastmri.pl_modules import MriModule
-from models.Model import DAGMR
+from models.Model import DAGMRNetworkModel
 from typing import List
 from skimage.metrics import structural_similarity as ssim
 from skimage.metrics import peak_signal_noise_ratio as psnr
@@ -118,7 +118,7 @@ class DAGMRNetModule(MriModule):
         self.lr_gamma = lr_gamma
         self.weight_decay = weight_decay
 
-        self.promptmr = DAGMR(
+        self.promptmr = DAGMRNetworkModel(
             num_cascades=self.num_cascades,
             num_adj_slices=self.num_adj_slices,
             n_feat0=self.n_feat0,
