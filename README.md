@@ -10,3 +10,4 @@ Model should be described here
 
 Check install.md to install the dependencies.
 
+also can request the interpreter to be sent to you
