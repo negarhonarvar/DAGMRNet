@@ -16,6 +16,8 @@ adding data perpretation, link to miccai
 
 ## Training/Inference Codes & Pretrained models
 
+google drive link
+
 ## Update
 
  listed here
