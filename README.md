@@ -20,4 +20,4 @@ adding data perpretation, link to miccai
 
 ## AcknoAcknowledgements
 
-promptMR,DAGL,E2E-varnet, Humos
+promptMR, DAGL, E2E-varnet, HUMUS-Net, PromptIR, CMRIXRecon
