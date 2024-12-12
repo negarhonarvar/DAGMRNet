@@ -4,7 +4,7 @@ This repository contains the pytorch implementation of DAGMRNet, a comprehensive
 
 ## Method
 
-Model but nit wo=
+An abstraction of the model
 
 ## Install
 
