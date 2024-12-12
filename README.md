@@ -6,7 +6,7 @@ This repository contains the pytorch implementation of DAGMRNet, a comprehensive
 
 An abstraction of the model
 
-## Install
+## Installation and Data Preparation
 
 Check install.md to install the dependencies.
 
@@ -15,3 +15,4 @@ also can request the interpreter to be sent to you
 ## Update
 
  listed here
+
