@@ -18,3 +18,6 @@ adding data perpretation, link to miccai
 
  listed here
 
+## AcknoAcknowledgements
+
+promptMR,DAGL,E2E-varnet, Humos
