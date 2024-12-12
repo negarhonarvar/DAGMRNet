@@ -12,6 +12,8 @@ Check install.md to install the dependencies.
 
 also can request the interpreter to be sent to you
 
+adding data perpretation, link to miccai
+
 ## Update
 
  listed here
