@@ -24,6 +24,6 @@ also add other important sections
 
  listed here
 
-## AcknoAcknowledgements
+## Acknowledgements
 
 promptMR, DAGL, E2E-varnet, HUMUS-Net, PromptIR, CMRIxRecon
