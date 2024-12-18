@@ -90,7 +90,7 @@ def cli_main(args):
     trainer = pl.Trainer.from_argparse_args(
             args ,
             log_every_n_steps=1, 
-            accelerator='cpu',  # gpu
+            accelerator='gpu',  # gpu
             logger = logger , 
             # pin_memory=True ,
             profiler="simple")
@@ -118,7 +118,7 @@ def build_args():
     batch_size = 1
 
     # set defaults based on optional directory config
-    data_path = pathlib.Path(r"F:\HPC\CMRxRecon2024\home2\Raw_data\MICCAIChallenge2024\ChallengeData\MultiCoil")
+    data_path = pathlib.Path(r"home\user01\HPC\CMRxRecon2024\home2\Raw_data\MICCAIChallenge2024\ChallengeData\MultiCoil")
     # data_path = pathlib.Path(r"D:\\CMRxRecon2023\\MultiCoil")
 
     # data_path = "D:\\CMRxRecon2023\\MultiCoil"
@@ -213,7 +213,7 @@ def build_args():
     parser.set_defaults(
         gpus=1,  # number of gpus to use
         replace_sampler_ddp=False,  # this is necessary for volume dispatch during val
-        strategy=None,  # what distributed version to use
+        strategy="dp",  # what distributed version to use
         # strategy="dp",  # what distributed version to use
         seed=42,  # random seed
         deterministic=False,  # makes things slower, but deterministic
