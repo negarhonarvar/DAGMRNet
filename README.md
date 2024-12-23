@@ -5,6 +5,7 @@ This repository contains the pytorch implementation of DAGMRNet, a comprehensive
 ## Method
 
 An abstraction of the model
+note = the attention mechanism needs to be altered
 
 ## Installation and Data Preparation
 
