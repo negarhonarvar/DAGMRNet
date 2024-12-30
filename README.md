@@ -22,7 +22,6 @@ google drive link
 ## Update
 
 also add other important sections
-listed here
 
 ## Acknowledgements
 
