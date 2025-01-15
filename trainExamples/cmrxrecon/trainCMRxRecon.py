@@ -4,6 +4,7 @@ import pathlib
 from argparse import ArgumentParser
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(pathlib.Path(__file__).parent.absolute())))
+# os.environ["TORCH_DISTRIBUTED_USE_LIBUV"] = "0"
 
 from data.transforms import DAGMRNetDataTransform
 from pl_modules.cmrxrecon_data_module import CmrxReconDataModule
@@ -46,7 +47,7 @@ def cli_main(args):
         test_path=args.test_path,
         sample_rate=0.01,
         batch_size=1,
-        num_workers=10,
+        num_workers=12,
         distributed_sampler=(args.strategy in (
             "ddp_find_unused_parameters_false", "ddp", "ddp_cpu")),
     )
@@ -55,7 +56,7 @@ def cli_main(args):
     # model
     # ------------
     model = DAGMRNetModule(
-        num_cascades= 8,    # args.num_cascades,
+        num_cascades= 12,    # args.num_cascades,
         num_adj_slices=args.num_adj_slices,
         n_feat0=args.n_feat0,
         feature_dim = args.feature_dim,
@@ -86,12 +87,12 @@ def cli_main(args):
     # ------------
     # trainer
     # ------------
- 
+
     trainer = pl.Trainer.from_argparse_args(
             args ,
-            log_every_n_steps=1, 
-            accelerator='gpu',  # gpu
-            logger = logger , 
+            log_every_n_steps=1,
+            accelerator='cpu',  # gpu
+            logger = logger ,
             # pin_memory=True ,
             profiler="simple")
 
@@ -111,14 +112,14 @@ def build_args():
 
     # basic args
     # num_gpus = 2
-    
+
     backend = "ddp_find_unused_parameters_false"
     # backend = "ddp_cpu"
 
     batch_size = 1
 
     # set defaults based on optional directory config
-    data_path = pathlib.Path(r"home\user01\HPC\CMRxRecon2024\home2\Raw_data\MICCAIChallenge2024\ChallengeData\MultiCoil")
+    data_path = pathlib.Path(r"D:\HPC\CMRxRecon2024\home2\Raw_data\MICCAIChallenge2024\ChallengeData\MultiCoil")
     # data_path = pathlib.Path(r"D:\\CMRxRecon2023\\MultiCoil")
 
     # data_path = "D:\\CMRxRecon2023\\MultiCoil"
@@ -185,7 +186,7 @@ def build_args():
     # module config
     parser = DAGMRNetModule.add_model_specific_args(parser)
     parser.set_defaults(
-        num_cascades=8,  # number of unrolled iterations
+        num_cascades=12,  # number of unrolled iterations
         num_adj_slices=1,  # number of adjacent slices
 
         n_feat0=48,  # number of top-level channels for PromptUnet , default value was 48
@@ -213,8 +214,8 @@ def build_args():
     parser.set_defaults(
         gpus=1,  # number of gpus to use
         replace_sampler_ddp=False,  # this is necessary for volume dispatch during val
-        strategy="dp",  # what distributed version to use
         # strategy="dp",  # what distributed version to use
+        strategy=None,  
         seed=42,  # random seed
         deterministic=False,  # makes things slower, but deterministic
         # precision=16,

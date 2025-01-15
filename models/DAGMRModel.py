@@ -9,7 +9,6 @@ import os
 import math
 from models.Utilities import test_x8
 import torch.utils.checkpoint as checkpoint
-
 #########################################################################
 # -------------------------------  DAGMRNET ----------------------------------
 
@@ -98,118 +97,92 @@ def ExtractImagePatches(images, ksizes, strides, rates, padding='same'):
 Graph model
 """
 class DynamicAttentionMechanism(nn.Module):
-    def __init__(self, ksize=7, stride_1=4, stride_2=1, softmax_scale=10,shape=64 ,p_len=64,in_channels=64
-                 , inter_channels=16,use_multiple_size=False,use_topk=False,add_SE=False,num_edge = 50):
+    def __init__(self, ksize=7, stride_1=4, stride_2=1, softmax_scale=10, in_channels=64, inter_channels=16, top_m=10000000):
         super(DynamicAttentionMechanism, self).__init__()
         self.ksize = ksize
-        self.shape=shape
-        self.p_len=p_len
         self.stride_1 = stride_1
         self.stride_2 = stride_2
         self.softmax_scale = softmax_scale
-        self.inter_channels = inter_channels
         self.in_channels = in_channels
-        self.use_multiple_size=use_multiple_size
-        self.use_topk=use_topk
-        self.add_SE=add_SE
-        self.num_edge = num_edge
-        
-        # feature compression layer with a kernel size of 3
-        self.g = nn.Conv2d(in_channels=self.in_channels, out_channels=self.inter_channels, kernel_size=3, stride=1,
-                           padding=1)
-        
-        # pointwise transformation, adjusting the number of channels without affecting the spatial dimensions.
-        self.W = nn.Conv2d(in_channels=self.inter_channels, out_channels=self.in_channels, kernel_size=1, stride=1,
-                           padding=0)
-        
-        #  transforming the input feature maps into a lower dimensional space , similar to g
-        self.theta = nn.Conv2d(in_channels=self.in_channels, out_channels=self.inter_channels, kernel_size=1, stride=1,
-                               padding=0)
-        
-        # fully connected layer with relu operating on flattened patch-level features (ksize is kernel size).
-        # The output size is one-fourth of the input size, effectively reducing the feature dimension.
-        self.fc1 = nn.Sequential(
-            nn.Linear(in_features=ksize**2*inter_channels,out_features=(ksize**2*inter_channels)//4),
-            nn.ReLU()
-        )
-        self.fc2 = nn.Sequential(
-            nn.Linear(in_features=ksize**2*inter_channels,out_features=(ksize**2*inter_channels)//4),
-            nn.ReLU()
-        )
+        self.inter_channels = inter_channels
+        self.top_m = top_m
 
-        # generating threshold and bias terms for soft thresholding mechanism
-        self.thr_conv = nn.Conv2d(in_channels=in_channels,out_channels=1,kernel_size=ksize,stride=stride_1,padding=0)
-        self.bias_conv = nn.Conv2d(in_channels=in_channels,out_channels=1,kernel_size=ksize,stride=stride_1,padding=0)
+        # Convolutional layers for transformation
+        self.g = nn.Conv2d(in_channels, inter_channels, kernel_size=3, stride=1, padding=1)
+        self.theta = nn.Conv2d(in_channels, inter_channels, kernel_size=1, stride=1, padding=0)
+        self.phi = nn.Conv2d(in_channels, inter_channels, kernel_size=1, stride=1, padding=0)
+        self.W = nn.Conv2d(inter_channels, in_channels, kernel_size=1, stride=1, padding=0)
 
-    def forward(self, b):
-        b1 = self.g(b)
-        b2 = self.theta(b)
-        b3 = b1
-        
-        raw_int_bs = list(b1.size())  # b*c*h*w
-        b4, _ = same_padding(b,[self.ksize,self.ksize],[self.stride_1,self.stride_1],[1,1])
-        soft_thr = self.thr_conv(b4).view(raw_int_bs[0],-1)
-        soft_bias = self.bias_conv(b4).view(raw_int_bs[0],-1)
+        # Additional layer to match the number of channels
+        self.match_channels = nn.Conv2d(in_channels, inter_channels, kernel_size=1, stride=1, padding=0)
 
-        # extracts patches from b1
-        patch_28, paddings_28 = ExtractImagePatches(b1, ksizes=[self.ksize, self.ksize],
-                                                    strides=[self.stride_1, self.stride_1],
-                                                    rates=[1, 1],
-                                                    padding='same')
-        patch_28 = patch_28.view(raw_int_bs[0], raw_int_bs[1], self.ksize, self.ksize, -1)
-        patch_28 = patch_28.permute(0, 4, 1, 2, 3)
-        patch_28_group = torch.split(patch_28, 1, dim=0)
+        # Layer to restore the number of channels to the original input channels
+        self.restore_channels = nn.Conv2d(inter_channels, in_channels, kernel_size=1, stride=1, padding=0)
 
-        # Similar to patch_28, patches are extracted from b2 but using different stride parameters
-        patch_112, paddings_112 = ExtractImagePatches(b2, ksizes=[self.ksize, self.ksize],
-                                                      strides=[self.stride_2, self.stride_2],
-                                                      rates=[1, 1],
-                                                      padding='same')
+    def forward(self, x):
+        batch_size, channels, height, width = x.size()
+        # print(f"Input shape: {x.shape}")
 
-        patch_112 = patch_112.view(raw_int_bs[0], raw_int_bs[1], self.ksize, self.ksize, -1)
-        patch_112 = patch_112.permute(0, 4, 1, 2, 3)
-        patch_112_group = torch.split(patch_112, 1, dim=0)
+        # Feature transformation
+        b1 = self.g(x)  # [batch_size, inter_channels, height, width]
+        b2 = self.theta(x)  # [batch_size, inter_channels, height, width]
+        b3 = self.phi(x)  # [batch_size, inter_channels, height, width]
+        # print(f"Shape after g: {b1.shape}")
+        # print(f"Shape after theta: {b2.shape}")
+        # print(f"Shape after phi: {b3.shape}")
 
-        # patches are again extracted from b3 using similar settings as for b2
-        patch_112_2, paddings_112_2 = ExtractImagePatches(b3, ksizes=[self.ksize, self.ksize],
-                                                          strides=[self.stride_2, self.stride_2],
-                                                          rates=[1, 1],
-                                                          padding='same')
+        # Unfold (extract patches)
+        unfold = nn.Unfold(kernel_size=self.ksize, stride=self.stride_1)
+        fold = nn.Fold(output_size=(height, width), kernel_size=self.ksize, stride=self.stride_1)
 
-        patch_112_2 = patch_112_2.view(raw_int_bs[0], raw_int_bs[1], self.ksize, self.ksize, -1)
-        patch_112_2 = patch_112_2.permute(0, 4, 1, 2, 3)
-        patch_112_group_2 = torch.split(patch_112_2, 1, dim=0)
-        y = []
-        w, h = raw_int_bs[2], raw_int_bs[3]
-        _, paddings = same_padding(b3[0,0].unsqueeze(0).unsqueeze(0), [self.ksize, self.ksize], [self.stride_2, self.stride_2], [1, 1])
-        for xi, wi,pi,thr,bias in zip(patch_112_group_2, patch_28_group, patch_112_group,soft_thr,soft_bias):
-            c_s = pi.shape[2]
-            k_s = wi[0].shape[2]
-            wi = self.fc1(wi.view(wi.shape[1],-1))
-            xi = self.fc2(xi.view(xi.shape[1],-1)).permute(1,0)
-            score_map = torch.matmul(wi,xi)
-            score_map = score_map.view(1, score_map.shape[0], math.ceil(w / self.stride_2),
-                                       math.ceil(h / self.stride_2))
-            b_s, l_s, h_s, w_s = score_map.shape
-            yi = score_map.view(l_s, -1)
-            mask = F.relu(yi-yi.mean(dim=1,keepdim=True)*thr.unsqueeze(1)+bias.unsqueeze(1))
-            mask_b = (mask!=0.).float()
-            yi = yi * mask
-            yi = F.softmax(yi * self.softmax_scale, dim=1)
-            yi = yi * mask_b
-            pi = pi.view(h_s * w_s, -1)
-            yi = torch.mm(yi, pi)
-            yi = yi.view(b_s, l_s, c_s, k_s, k_s)[0]
-            zi = yi.view(1, l_s, -1).permute(0, 2, 1)
-            zi = torch.nn.functional.fold(zi, (raw_int_bs[2], raw_int_bs[3]), (self.ksize, self.ksize), padding=paddings[0], stride=self.stride_1)
-            inp = torch.ones_like(zi)
-            inp_unf = torch.nn.functional.unfold(inp, (self.ksize, self.ksize), padding=paddings[0], stride=self.stride_1)
-            out_mask = torch.nn.functional.fold(inp_unf, (raw_int_bs[2], raw_int_bs[3]), (self.ksize, self.ksize), padding=paddings[0], stride=self.stride_1)
-            zi = zi / out_mask
-            y.append(zi)
-        y = torch.cat(y, dim=0)
-        return y
+        patches_b1 = unfold(b1).permute(0, 2, 1)  # [batch_size, num_patches, patch_size]
+        patches_b2 = unfold(b2).permute(0, 2, 1)  # [batch_size, num_patches, patch_size]
+        patches_b3 = unfold(b3).permute(0, 2, 1)  # [batch_size, num_patches, patch_size]
+        # print(f"Shape of patches_b1: {patches_b1.shape}")
+        # print(f"Shape of patches_b2: {patches_b2.shape}")
+        # print(f"Shape of patches_b3: {patches_b3.shape}")
 
+        # Compute attention scores
+        score_map = torch.bmm(patches_b1, patches_b2.transpose(1, 2))  # [batch_size, num_patches, num_patches]
+        # print(f"Shape of score_map: {score_map.shape}")
+        valid_top_m = min(self.top_m, score_map.size(-1))
+        top_m_values, top_m_indices = torch.topk(score_map, k=valid_top_m, dim=-1)
+        sparse_score_map = torch.zeros_like(score_map).scatter_(-1, top_m_indices, top_m_values)
+        sparse_score_map = F.softmax(sparse_score_map * self.softmax_scale, dim=-1)
+        # print(f"Shape of sparse_score_map: {sparse_score_map.shape}")
+
+        # Apply sparse attention
+        aggregated_patches = torch.bmm(sparse_score_map, patches_b3)  # [batch_size, num_patches, patch_size]
+        # print(f"Shape of aggregated_patches: {aggregated_patches.shape}")
+
+        # Reshape back into spatial dimensions
+        aggregated_patches = aggregated_patches.permute(0, 2, 1)  # [batch_size, patch_size, num_patches]
+        output = fold(aggregated_patches)
+        # print(f"Shape of output after fold: {output.shape}")
+
+        # Generate dynamic normalization mask
+        normalization_mask = fold(unfold(torch.ones_like(x)))
+        # print(f"Shape of normalization_mask: {normalization_mask.shape}")
+
+        # Match the number of channels in normalization_mask to output
+        normalization_mask = self.match_channels(normalization_mask)
+        # print(f"Shape of normalization_mask after matching channels: {normalization_mask.shape}")
+
+        # Ensure dimensions match
+        if normalization_mask.size(1) != output.size(1):
+            normalization_mask = normalization_mask.expand(batch_size, output.size(1), height, width)
+
+        output = output / (normalization_mask + 1e-8)
+        # print(f"Shape of output after normalization: {output.shape}")
+
+        # Restore the number of channels to the original input channels
+        output = self.restore_channels(output)
+        # print(f"Final output shape: {output.shape}")
+
+        # Ensure the output shape matches the input shape
+        assert output.size() == x.size(), f"Output shape {output.size()} does not match input shape {x.size()}"
+
+        return output
 
 class M_GFAM(nn.Module):
     def __init__(self, in_channels, num=4):
@@ -227,25 +200,26 @@ class M_GFAM(nn.Module):
         self.c1_2 = DynamicAttentionMechanism(in_channels=in_channels)
         self.c1_3 = DynamicAttentionMechanism(in_channels=in_channels)
         # self.c1_4 = CE(in_channels=in_channels)
-        self.c1_c = nn.Conv2d(in_channels, in_channels, 1, 1, 0)
+        self.c1_c = nn.Conv2d(in_channels*3, in_channels, 1, 1, 0)
 
         # stage 2 (3 heads)
         self.c2_1 = DynamicAttentionMechanism(in_channels=in_channels)
         self.c2_2 = DynamicAttentionMechanism(in_channels=in_channels)
         self.c2_3 = DynamicAttentionMechanism(in_channels=in_channels)
         # # self.c2_4 = CE(in_channels=in_channels)
-        self.c2_c = nn.Conv2d(in_channels, in_channels, 1, 1, 0)
+        self.c2_c = nn.Conv2d(in_channels*3, in_channels, 1, 1, 0)
 
         # stage 3 (3 heads)
         self.c3_1 = DynamicAttentionMechanism(in_channels=in_channels)
         self.c3_2 = DynamicAttentionMechanism(in_channels=in_channels)
         self.c3_3 = DynamicAttentionMechanism(in_channels=in_channels)
         # # self.c3_4 = CE(in_channels=in_channels)
-        self.c3_c = nn.Conv2d(in_channels, in_channels, 1, 1, 0)
+        self.c3_c = nn.Conv2d(in_channels*3, in_channels, 1, 1, 0)
 
     def forward(self, x):
 
         # Stage 1 (3-head)
+        # print(f"input to M-GFAM shape: {x.shape}")
         out = self.c1_c(torch.cat((self.c1_1(x), self.c1_2(x), self.c1_3(x)), dim=1)) + x
         out = self.RBS1(out)
 
@@ -257,7 +231,6 @@ class M_GFAM(nn.Module):
         # # Stage 3 (3-head)
         out = self.c3_c(torch.cat((self.c3_1(out), self.c3_2(out), self.c3_3(out)), dim=1)) + out
         return out
-
 
 class DAGMR(nn.Module):
     def __init__(self, args, conv=default_conv):
