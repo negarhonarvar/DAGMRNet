@@ -11,6 +11,8 @@ from models.Utilities import test_x8
 import torch.utils.checkpoint as checkpoint
 from torch_geometric.nn import GCNConv
 from torch_geometric.utils import grid
+import torch
+
 #########################################################################
 # -------------------------------  DAGMRNET ----------------------------------
 
@@ -98,37 +100,46 @@ def ExtractImagePatches(images, ksizes, strides, rates, padding='same'):
 """
 Graph model
 """
-from torch_geometric.utils import grid, add_self_loops
-
 def create_8_connected_grid(height, width):
     """
-    Create an 8-connected grid graph for a 2D feature map.
+    Create an 8-connected grid graph for a 2D feature map efficiently.
+    Args:
+        height (int): Height of the grid.
+        width (int): Width of the grid.
+    Returns:
+        torch.Tensor: edge_index of shape [2, num_edges], defining an 8-connected graph.
     """
-    edge_index = grid(height, width)  # 4-connected grid
     num_nodes = height * width
+
+    # Generate linear indices for the grid
+    indices = torch.arange(num_nodes).reshape(height, width)
+
+    # Define offsets for 8-connected neighbors
+    neighbors = [
+        (-1, -1), (-1, 0), (-1, 1),
+        (0, -1),          (0, 1),
+        (1, -1), (1, 0), (1, 1),
+    ]
+
     edges = []
+    for dr, dc in neighbors:
+        # Roll the indices to simulate neighbor connections
+        rolled = torch.roll(indices, shifts=(dr, dc), dims=(0, 1))
 
-    for row in range(height):
-        for col in range(width):
-            current = row * width + col
-            neighbors = [
-                ((row - 1) * width + col - 1) if row > 0 and col > 0 else None,  # Top-left
-                ((row - 1) * width + col) if row > 0 else None,                 # Top
-                ((row - 1) * width + col + 1) if row > 0 and col < width - 1 else None,  # Top-right
-                (row * width + col - 1) if col > 0 else None,                   # Left
-                (row * width + col + 1) if col < width - 1 else None,           # Right
-                ((row + 1) * width + col - 1) if row < height - 1 and col > 0 else None,  # Bottom-left
-                ((row + 1) * width + col) if row < height - 1 else None,        # Bottom
-                ((row + 1) * width + col + 1) if row < height - 1 and col < width - 1 else None  # Bottom-right
-            ]
-            for neighbor in neighbors:
-                if neighbor is not None:
-                    edges.append((current, neighbor))
+        # Mask out invalid edges (e.g., wrapping around the edges of the grid)
+        if dr != 0:
+            rolled[(dr > 0) * torch.arange(height)[:dr], :] = -1
+        if dc != 0:
+            rolled[:, (dc > 0) * torch.arange(width)[:dc]] = -1
 
-    edge_index = torch.tensor(edges, dtype=torch.long).t()
-    edge_index, _ = add_self_loops(edge_index, num_nodes=num_nodes)  # Add self-loops
+        edges.append(torch.stack([indices.flatten(), rolled.flatten()]))
+
+    # Combine all edges and filter out invalid (-1) indices
+    edge_index = torch.cat(edges, dim=1)
+    valid_mask = (edge_index >= 0).all(dim=0)
+    edge_index = edge_index[:, valid_mask]
+
     return edge_index
-
 
 class DynamicAttentionMechanism(nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels, num_layers=3):
@@ -141,13 +152,19 @@ class DynamicAttentionMechanism(nn.Module):
 
     def forward(self, x):
         batch_size, channels, height, width = x.size()
+
+        # Reshape input for GCN
         x = x.view(batch_size, channels, -1).permute(0, 2, 1)  # [B, HW, C]
+
+        # Create optimized 8-connected grid
         edge_index = create_8_connected_grid(height, width).to(x.device)
 
+        # Apply GCN layers
         for layer in self.layers:
             x = F.relu(layer(x, edge_index))
-        return x.view(batch_size, height, width, -1).permute(0, 3, 1, 2)
 
+        # Reshape output back to spatial dimensions
+        return x.view(batch_size, height, width, -1).permute(0, 3, 1, 2)
 
 class M_GFAM(nn.Module):
     def __init__(self, in_channels, num=4):
