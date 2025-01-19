@@ -9,6 +9,8 @@ import os
 import math
 from models.Utilities import test_x8
 import torch.utils.checkpoint as checkpoint
+from torch_geometric.nn import GCNConv
+from torch_geometric.utils import grid
 #########################################################################
 # -------------------------------  DAGMRNET ----------------------------------
 
@@ -96,93 +98,56 @@ def ExtractImagePatches(images, ksizes, strides, rates, padding='same'):
 """
 Graph model
 """
+from torch_geometric.utils import grid, add_self_loops
+
+def create_8_connected_grid(height, width):
+    """
+    Create an 8-connected grid graph for a 2D feature map.
+    """
+    edge_index = grid(height, width)  # 4-connected grid
+    num_nodes = height * width
+    edges = []
+
+    for row in range(height):
+        for col in range(width):
+            current = row * width + col
+            neighbors = [
+                ((row - 1) * width + col - 1) if row > 0 and col > 0 else None,  # Top-left
+                ((row - 1) * width + col) if row > 0 else None,                 # Top
+                ((row - 1) * width + col + 1) if row > 0 and col < width - 1 else None,  # Top-right
+                (row * width + col - 1) if col > 0 else None,                   # Left
+                (row * width + col + 1) if col < width - 1 else None,           # Right
+                ((row + 1) * width + col - 1) if row < height - 1 and col > 0 else None,  # Bottom-left
+                ((row + 1) * width + col) if row < height - 1 else None,        # Bottom
+                ((row + 1) * width + col + 1) if row < height - 1 and col < width - 1 else None  # Bottom-right
+            ]
+            for neighbor in neighbors:
+                if neighbor is not None:
+                    edges.append((current, neighbor))
+
+    edge_index = torch.tensor(edges, dtype=torch.long).t()
+    edge_index, _ = add_self_loops(edge_index, num_nodes=num_nodes)  # Add self-loops
+    return edge_index
+
+
 class DynamicAttentionMechanism(nn.Module):
-    def __init__(self, ksize=7, stride_1=4, stride_2=1, softmax_scale=10, in_channels=64, inter_channels=16, top_m=10000000):
+    def __init__(self, in_channels, hidden_channels, out_channels, num_layers=3):
         super(DynamicAttentionMechanism, self).__init__()
-        self.ksize = ksize
-        self.stride_1 = stride_1
-        self.stride_2 = stride_2
-        self.softmax_scale = softmax_scale
-        self.in_channels = in_channels
-        self.inter_channels = inter_channels
-        self.top_m = top_m
-
-        # Convolutional layers for transformation
-        self.g = nn.Conv2d(in_channels, inter_channels, kernel_size=3, stride=1, padding=1)
-        self.theta = nn.Conv2d(in_channels, inter_channels, kernel_size=1, stride=1, padding=0)
-        self.phi = nn.Conv2d(in_channels, inter_channels, kernel_size=1, stride=1, padding=0)
-        self.W = nn.Conv2d(inter_channels, in_channels, kernel_size=1, stride=1, padding=0)
-
-        # Additional layer to match the number of channels
-        self.match_channels = nn.Conv2d(in_channels, inter_channels, kernel_size=1, stride=1, padding=0)
-
-        # Layer to restore the number of channels to the original input channels
-        self.restore_channels = nn.Conv2d(inter_channels, in_channels, kernel_size=1, stride=1, padding=0)
+        self.layers = nn.ModuleList()
+        self.layers.append(GCNConv(in_channels, hidden_channels))
+        for _ in range(num_layers - 2):
+            self.layers.append(GCNConv(hidden_channels, hidden_channels))
+        self.layers.append(GCNConv(hidden_channels, out_channels))
 
     def forward(self, x):
         batch_size, channels, height, width = x.size()
-        # print(f"Input shape: {x.shape}")
+        x = x.view(batch_size, channels, -1).permute(0, 2, 1)  # [B, HW, C]
+        edge_index = create_8_connected_grid(height, width).to(x.device)
 
-        # Feature transformation
-        b1 = self.g(x)  # [batch_size, inter_channels, height, width]
-        b2 = self.theta(x)  # [batch_size, inter_channels, height, width]
-        b3 = self.phi(x)  # [batch_size, inter_channels, height, width]
-        # print(f"Shape after g: {b1.shape}")
-        # print(f"Shape after theta: {b2.shape}")
-        # print(f"Shape after phi: {b3.shape}")
+        for layer in self.layers:
+            x = F.relu(layer(x, edge_index))
+        return x.view(batch_size, height, width, -1).permute(0, 3, 1, 2)
 
-        # Unfold (extract patches)
-        unfold = nn.Unfold(kernel_size=self.ksize, stride=self.stride_1)
-        fold = nn.Fold(output_size=(height, width), kernel_size=self.ksize, stride=self.stride_1)
-
-        patches_b1 = unfold(b1).permute(0, 2, 1)  # [batch_size, num_patches, patch_size]
-        patches_b2 = unfold(b2).permute(0, 2, 1)  # [batch_size, num_patches, patch_size]
-        patches_b3 = unfold(b3).permute(0, 2, 1)  # [batch_size, num_patches, patch_size]
-        # print(f"Shape of patches_b1: {patches_b1.shape}")
-        # print(f"Shape of patches_b2: {patches_b2.shape}")
-        # print(f"Shape of patches_b3: {patches_b3.shape}")
-
-        # Compute attention scores
-        score_map = torch.bmm(patches_b1, patches_b2.transpose(1, 2))  # [batch_size, num_patches, num_patches]
-        # print(f"Shape of score_map: {score_map.shape}")
-        valid_top_m = min(self.top_m, score_map.size(-1))
-        top_m_values, top_m_indices = torch.topk(score_map, k=valid_top_m, dim=-1)
-        sparse_score_map = torch.zeros_like(score_map).scatter_(-1, top_m_indices, top_m_values)
-        sparse_score_map = F.softmax(sparse_score_map * self.softmax_scale, dim=-1)
-        # print(f"Shape of sparse_score_map: {sparse_score_map.shape}")
-
-        # Apply sparse attention
-        aggregated_patches = torch.bmm(sparse_score_map, patches_b3)  # [batch_size, num_patches, patch_size]
-        # print(f"Shape of aggregated_patches: {aggregated_patches.shape}")
-
-        # Reshape back into spatial dimensions
-        aggregated_patches = aggregated_patches.permute(0, 2, 1)  # [batch_size, patch_size, num_patches]
-        output = fold(aggregated_patches)
-        # print(f"Shape of output after fold: {output.shape}")
-
-        # Generate dynamic normalization mask
-        normalization_mask = fold(unfold(torch.ones_like(x)))
-        # print(f"Shape of normalization_mask: {normalization_mask.shape}")
-
-        # Match the number of channels in normalization_mask to output
-        normalization_mask = self.match_channels(normalization_mask)
-        # print(f"Shape of normalization_mask after matching channels: {normalization_mask.shape}")
-
-        # Ensure dimensions match
-        if normalization_mask.size(1) != output.size(1):
-            normalization_mask = normalization_mask.expand(batch_size, output.size(1), height, width)
-
-        output = output / (normalization_mask + 1e-8)
-        # print(f"Shape of output after normalization: {output.shape}")
-
-        # Restore the number of channels to the original input channels
-        output = self.restore_channels(output)
-        # print(f"Final output shape: {output.shape}")
-
-        # Ensure the output shape matches the input shape
-        assert output.size() == x.size(), f"Output shape {output.size()} does not match input shape {x.size()}"
-
-        return output
 
 class M_GFAM(nn.Module):
     def __init__(self, in_channels, num=4):
@@ -195,31 +160,25 @@ class M_GFAM(nn.Module):
         self.RBS2 = nn.Sequential(*RBS2)
 
         # stage 1 (3 heads)
-        print("in_channels in CES :" , in_channels)
-        self.c1_1 = DynamicAttentionMechanism(in_channels=in_channels)
-        self.c1_2 = DynamicAttentionMechanism(in_channels=in_channels)
-        self.c1_3 = DynamicAttentionMechanism(in_channels=in_channels)
-        # self.c1_4 = CE(in_channels=in_channels)
-        self.c1_c = nn.Conv2d(in_channels*3, in_channels, 1, 1, 0)
+        self.c1_1 = DynamicAttentionMechanism(in_channels, in_channels, in_channels)
+        self.c1_2 = DynamicAttentionMechanism(in_channels, in_channels, in_channels)
+        self.c1_3 = DynamicAttentionMechanism(in_channels, in_channels, in_channels)
+        self.c1_c = nn.Conv2d(in_channels * 3, in_channels, 1, 1, 0)
 
         # stage 2 (3 heads)
-        self.c2_1 = DynamicAttentionMechanism(in_channels=in_channels)
-        self.c2_2 = DynamicAttentionMechanism(in_channels=in_channels)
-        self.c2_3 = DynamicAttentionMechanism(in_channels=in_channels)
-        # # self.c2_4 = CE(in_channels=in_channels)
-        self.c2_c = nn.Conv2d(in_channels*3, in_channels, 1, 1, 0)
+        self.c2_1 = DynamicAttentionMechanism(in_channels, in_channels, in_channels)
+        self.c2_2 = DynamicAttentionMechanism(in_channels, in_channels, in_channels)
+        self.c2_3 = DynamicAttentionMechanism(in_channels, in_channels, in_channels)
+        self.c2_c = nn.Conv2d(in_channels * 3, in_channels, 1, 1, 0)
 
         # stage 3 (3 heads)
-        self.c3_1 = DynamicAttentionMechanism(in_channels=in_channels)
-        self.c3_2 = DynamicAttentionMechanism(in_channels=in_channels)
-        self.c3_3 = DynamicAttentionMechanism(in_channels=in_channels)
-        # # self.c3_4 = CE(in_channels=in_channels)
-        self.c3_c = nn.Conv2d(in_channels*3, in_channels, 1, 1, 0)
+        self.c3_1 = DynamicAttentionMechanism(in_channels, in_channels, in_channels)
+        self.c3_2 = DynamicAttentionMechanism(in_channels, in_channels, in_channels)
+        self.c3_3 = DynamicAttentionMechanism(in_channels, in_channels, in_channels)
+        self.c3_c = nn.Conv2d(in_channels * 3, in_channels, 1, 1, 0)
 
     def forward(self, x):
-
         # Stage 1 (3-head)
-        # print(f"input to M-GFAM shape: {x.shape}")
         out = self.c1_c(torch.cat((self.c1_1(x), self.c1_2(x), self.c1_3(x)), dim=1)) + x
         out = self.RBS1(out)
 
@@ -227,8 +186,7 @@ class M_GFAM(nn.Module):
         out = self.c2_c(torch.cat((self.c2_1(out), self.c2_2(out), self.c2_3(out)), dim=1)) + out
         out = self.RBS2(out)
 
-
-        # # Stage 3 (3-head)
+        # Stage 3 (3-head)
         out = self.c3_c(torch.cat((self.c3_1(out), self.c3_2(out), self.c3_3(out)), dim=1)) + out
         return out
 
