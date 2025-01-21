@@ -11,7 +11,8 @@ from models.Utilities import test_x8
 import torch.utils.checkpoint as checkpoint
 from torch_geometric.nn import GCNConv
 import torch
-
+from torch_geometric.nn import GATv2Conv
+from torch_geometric.utils import add_self_loops
 #########################################################################
 # -------------------------------  DAGMRNET ----------------------------------
 
@@ -98,26 +99,13 @@ def ExtractImagePatches(images, ksizes, strides, rates, padding='same'):
 """
 Attention Mechanism
 """
-class SparseGraphAttentionLayer(nn.Module):
-    def __init__(self, in_channels, out_channels, num_heads=1):
-        super(SparseGraphAttentionLayer, self).__init__()
-        self.num_heads = num_heads
-        self.attention_layers = nn.ModuleList(
-            [GCNConv(in_channels, out_channels) for _ in range(num_heads)]
-        )
-        self.out_projection = nn.Linear(out_channels * num_heads, out_channels)
+class GraphAttentionLayer(nn.Module):
+    def __init__(self, in_channels, out_channels, num_heads=4, dropout=0.2):
+        super(GraphAttentionLayer, self).__init__()
+        self.gat = GATv2Conv(in_channels, out_channels // num_heads, heads=num_heads, dropout=dropout)
 
     def forward(self, x, edge_index):
-        head_outputs = []
-        for attention_layer in self.attention_layers:
-            head_outputs.append(F.relu(attention_layer(x, edge_index)))
-
-        # Concatenate outputs from all attention heads
-        concatenated = torch.cat(head_outputs, dim=-1)
-
-        # Final projection
-        output = self.out_projection(concatenated)
-        return output
+        return F.elu(self.gat(x, edge_index))
 
 """
 Graph Model
@@ -164,14 +152,16 @@ def create_8_connected_grid(height, width, device=None):
 
     return edge_index
 
-class SparseGraphAttentionModule(nn.Module):
-    def __init__(self, in_channels, hidden_channels, out_channels, num_heads=1, num_layers=3):
-        super(SparseGraphAttentionModule, self).__init__()
+class GraphAttentionModule(nn.Module):
+    def __init__(self, in_channels, hidden_channels, out_channels, num_heads=4, num_layers=3, dropout=0.2):
+        super(GraphAttentionModule, self).__init__()
         self.layers = nn.ModuleList()
-        self.layers.append(SparseGraphAttentionLayer(in_channels, hidden_channels, num_heads))
+        self.layers.append(GraphAttentionLayer(in_channels, hidden_channels, num_heads, dropout))
+
         for _ in range(num_layers - 2):
-            self.layers.append(SparseGraphAttentionLayer(hidden_channels, hidden_channels, num_heads))
-        self.layers.append(SparseGraphAttentionLayer(hidden_channels, out_channels, num_heads))
+            self.layers.append(GraphAttentionLayer(hidden_channels, hidden_channels, num_heads, dropout))
+
+        self.layers.append(GraphAttentionLayer(hidden_channels, out_channels, num_heads, dropout))
 
     def forward(self, x, edge_index):
         for layer in self.layers:
@@ -179,31 +169,27 @@ class SparseGraphAttentionModule(nn.Module):
         return x
 
 class M_GFAM(nn.Module):
-    def __init__(self, in_channels, num=4):
+    def __init__(self, in_channels, num=4, num_heads=4, dropout=0.2):
         super(M_GFAM, self).__init__()
-        RBS1 = [ResBlock(default_conv, n_feats=in_channels, kernel_size=3, act=nn.PReLU(), res_scale=1
-                         ) for _ in range(num)]
-        self.RBS1 = nn.Sequential(*RBS1)
-        RBS2 = [ResBlock(default_conv, n_feats=in_channels, kernel_size=3, act=nn.PReLU(), res_scale=1
-                         ) for _ in range(num)]
-        self.RBS2 = nn.Sequential(*RBS2)
+        
+        # ResBlock stages
+        self.RBS1 = nn.Sequential(*[ResBlock(default_conv, in_channels, 3, act=nn.PReLU(), res_scale=1) for _ in range(num)])
+        self.RBS2 = nn.Sequential(*[ResBlock(default_conv, in_channels, 3, act=nn.PReLU(), res_scale=1) for _ in range(num)])
 
-        # stage 1 (3 heads)
-        self.c1_1 = SparseGraphAttentionModule(in_channels, in_channels, in_channels)
-        self.c1_2 = SparseGraphAttentionModule(in_channels, in_channels, in_channels)
-        self.c1_3 = SparseGraphAttentionModule(in_channels, in_channels, in_channels)
+        # Graph Attention Module for multi-scale spatial learning
+        self.c1_1 = GraphAttentionModule(in_channels, in_channels, in_channels, num_heads=num_heads, dropout=dropout)
+        self.c1_2 = GraphAttentionModule(in_channels, in_channels, in_channels, num_heads=num_heads, dropout=dropout)
+        self.c1_3 = GraphAttentionModule(in_channels, in_channels, in_channels, num_heads=num_heads, dropout=dropout)
         self.c1_c = nn.Conv2d(in_channels * 3, in_channels, 1, 1, 0)
 
-        # stage 2 (3 heads)
-        self.c2_1 = SparseGraphAttentionModule(in_channels, in_channels, in_channels)
-        self.c2_2 = SparseGraphAttentionModule(in_channels, in_channels, in_channels)
-        self.c2_3 = SparseGraphAttentionModule(in_channels, in_channels, in_channels)
+        self.c2_1 = GraphAttentionModule(in_channels, in_channels, in_channels, num_heads=num_heads, dropout=dropout)
+        self.c2_2 = GraphAttentionModule(in_channels, in_channels, in_channels, num_heads=num_heads, dropout=dropout)
+        self.c2_3 = GraphAttentionModule(in_channels, in_channels, in_channels, num_heads=num_heads, dropout=dropout)
         self.c2_c = nn.Conv2d(in_channels * 3, in_channels, 1, 1, 0)
 
-        # stage 3 (3 heads)
-        self.c3_1 = SparseGraphAttentionModule(in_channels, in_channels, in_channels)
-        self.c3_2 = SparseGraphAttentionModule(in_channels, in_channels, in_channels)
-        self.c3_3 = SparseGraphAttentionModule(in_channels, in_channels, in_channels)
+        self.c3_1 = GraphAttentionModule(in_channels, in_channels, in_channels, num_heads=num_heads, dropout=dropout)
+        self.c3_2 = GraphAttentionModule(in_channels, in_channels, in_channels, num_heads=num_heads, dropout=dropout)
+        self.c3_3 = GraphAttentionModule(in_channels, in_channels, in_channels, num_heads=num_heads, dropout=dropout)
         self.c3_c = nn.Conv2d(in_channels * 3, in_channels, 1, 1, 0)
 
     def forward(self, x):
@@ -235,7 +221,7 @@ class DAGMR(nn.Module):
         ])
 
         self.graph_layers = nn.ModuleList([
-            SparseGraphAttentionModule(self.n_feats, self.n_feats, self.n_feats, num_heads=4, num_layers=3)
+            GraphAttentionModule(self.n_feats, self.n_feats, self.n_feats, num_heads=4, num_layers=3)
         ])
 
         self.tail = nn.Sequential(conv(self.n_feats, 2, self.kernel_size))
