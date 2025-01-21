@@ -10,7 +10,6 @@ import math
 from models.Utilities import test_x8
 import torch.utils.checkpoint as checkpoint
 from torch_geometric.nn import GCNConv
-from torch_geometric.utils import grid
 import torch
 
 #########################################################################
@@ -96,9 +95,32 @@ def ExtractImagePatches(images, ksizes, strides, rates, padding='same'):
     patches = unfold(images)
     return patches, paddings
 
+"""
+Attention Mechanism
+"""
+class SparseGraphAttentionLayer(nn.Module):
+    def __init__(self, in_channels, out_channels, num_heads=1):
+        super(SparseGraphAttentionLayer, self).__init__()
+        self.num_heads = num_heads
+        self.attention_layers = nn.ModuleList(
+            [GCNConv(in_channels, out_channels) for _ in range(num_heads)]
+        )
+        self.out_projection = nn.Linear(out_channels * num_heads, out_channels)
+
+    def forward(self, x, edge_index):
+        head_outputs = []
+        for attention_layer in self.attention_layers:
+            head_outputs.append(F.relu(attention_layer(x, edge_index)))
+
+        # Concatenate outputs from all attention heads
+        concatenated = torch.cat(head_outputs, dim=-1)
+
+        # Final projection
+        output = self.out_projection(concatenated)
+        return output
 
 """
-Graph model
+Graph Model
 """
 def create_8_connected_grid(height, width, device=None):
     """
@@ -142,31 +164,19 @@ def create_8_connected_grid(height, width, device=None):
 
     return edge_index
 
-class GraphConstructionModule(nn.Module):
-    def __init__(self, in_channels, hidden_channels, out_channels, num_layers=3):
-        super(GraphConstructionModule, self).__init__()
+class SparseGraphAttentionModule(nn.Module):
+    def __init__(self, in_channels, hidden_channels, out_channels, num_heads=1, num_layers=3):
+        super(SparseGraphAttentionModule, self).__init__()
         self.layers = nn.ModuleList()
-        self.layers.append(GCNConv(in_channels, hidden_channels))
+        self.layers.append(SparseGraphAttentionLayer(in_channels, hidden_channels, num_heads))
         for _ in range(num_layers - 2):
-            self.layers.append(GCNConv(hidden_channels, hidden_channels))
-        self.layers.append(GCNConv(hidden_channels, out_channels))
+            self.layers.append(SparseGraphAttentionLayer(hidden_channels, hidden_channels, num_heads))
+        self.layers.append(SparseGraphAttentionLayer(hidden_channels, out_channels, num_heads))
 
-    def forward(self, x):
-        batch_size, channels, height, width = x.size()
-
-        # Reshape input for GCN
-        x = x.view(batch_size, channels, -1).permute(0, 2, 1)  # [B, HW, C]
-
-        # Ensure edge_index is on the same device as x
-        device = x.device
-        edge_index = create_8_connected_grid(height, width, device=device)
-
-        # Apply GCN layers
+    def forward(self, x, edge_index):
         for layer in self.layers:
-            x = F.relu(layer(x, edge_index))
-
-        # Reshape output back to spatial dimensions
-        return x.view(batch_size, height, width, -1).permute(0, 3, 1, 2)
+            x = layer(x, edge_index)
+        return x
 
 class M_GFAM(nn.Module):
     def __init__(self, in_channels, num=4):
@@ -179,21 +189,21 @@ class M_GFAM(nn.Module):
         self.RBS2 = nn.Sequential(*RBS2)
 
         # stage 1 (3 heads)
-        self.c1_1 = GraphConstructionModule(in_channels, in_channels, in_channels)
-        self.c1_2 = GraphConstructionModule(in_channels, in_channels, in_channels)
-        self.c1_3 = GraphConstructionModule(in_channels, in_channels, in_channels)
+        self.c1_1 = SparseGraphAttentionModule(in_channels, in_channels, in_channels)
+        self.c1_2 = SparseGraphAttentionModule(in_channels, in_channels, in_channels)
+        self.c1_3 = SparseGraphAttentionModule(in_channels, in_channels, in_channels)
         self.c1_c = nn.Conv2d(in_channels * 3, in_channels, 1, 1, 0)
 
         # stage 2 (3 heads)
-        self.c2_1 = GraphConstructionModule(in_channels, in_channels, in_channels)
-        self.c2_2 = GraphConstructionModule(in_channels, in_channels, in_channels)
-        self.c2_3 = GraphConstructionModule(in_channels, in_channels, in_channels)
+        self.c2_1 = SparseGraphAttentionModule(in_channels, in_channels, in_channels)
+        self.c2_2 = SparseGraphAttentionModule(in_channels, in_channels, in_channels)
+        self.c2_3 = SparseGraphAttentionModule(in_channels, in_channels, in_channels)
         self.c2_c = nn.Conv2d(in_channels * 3, in_channels, 1, 1, 0)
 
         # stage 3 (3 heads)
-        self.c3_1 = GraphConstructionModule(in_channels, in_channels, in_channels)
-        self.c3_2 = GraphConstructionModule(in_channels, in_channels, in_channels)
-        self.c3_3 = GraphConstructionModule(in_channels, in_channels, in_channels)
+        self.c3_1 = SparseGraphAttentionModule(in_channels, in_channels, in_channels)
+        self.c3_2 = SparseGraphAttentionModule(in_channels, in_channels, in_channels)
+        self.c3_3 = SparseGraphAttentionModule(in_channels, in_channels, in_channels)
         self.c3_c = nn.Conv2d(in_channels * 3, in_channels, 1, 1, 0)
 
     def forward(self, x):
@@ -225,19 +235,23 @@ class DAGMR(nn.Module):
         ])
 
         self.graph_layers = nn.ModuleList([
-            GraphConstructionModule(self.n_feats, self.n_feats, self.n_feats, num_layers=3)
+            SparseGraphAttentionModule(self.n_feats, self.n_feats, self.n_feats, num_heads=4, num_layers=3)
         ])
 
         self.tail = nn.Sequential(conv(self.n_feats, 2, self.kernel_size))
 
-    def forward(self, x, image=None):
+    def forward(self, x):
         x = self.head(x)
+
+        # Generate edge_index for graph layers
+        batch_size, _, height, width = x.size()
+        edge_index = create_8_connected_grid(height, width, device=x.device)
 
         for body_layer, graph_layer in zip(self.body, self.graph_layers):
             x = body_layer(x)
-            x = graph_layer(x)
+            x = graph_layer(x.view(-1, x.size(1)), edge_index)
 
-        x = self.tail(x)
+        x = self.tail(x.view(batch_size, -1, height, width))
         # print("RR Output Shape:", x.shape)
         print("RR Output Mean:", x.mean().item())
         # print(" RR forward output : ", (x + res).shape)

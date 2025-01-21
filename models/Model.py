@@ -620,7 +620,7 @@ class DAGMRNetworkModel(nn.Module):
 
     def __init__(
         self,
-        num_cascades: int = 8, # 12
+        num_cascades: int = 12, # 12
         num_adj_slices: int = 1, # 5
         n_feat0: int = 48, # 48
         feature_dim: List[int] = [72, 96, 120], # [72,96,120]

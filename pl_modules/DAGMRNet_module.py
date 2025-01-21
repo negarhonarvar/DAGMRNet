@@ -19,8 +19,8 @@ class DAGMRNetModule(MriModule):
 
     def __init__(
         self,
-        num_cascades: int = 1, # 12
-        num_adj_slices: int = 1, # 5
+        num_cascades: int = 12, # 12
+        num_adj_slices: int = 5, # 5
         n_feat0: int =48, # 48
         feature_dim: List[int] = [72, 96, 120], # [72, 96, 120]
         prompt_dim: List[int] = [24, 48, 72], # [24, 48, 72]
@@ -272,13 +272,13 @@ class DAGMRNetModule(MriModule):
         # network params
         parser.add_argument(
             "--num_cascades",
-            default=1, # default = 12
+            default=12, # default = 12
             type=int,
             help="Number of PromptMR cascades",
         )
         parser.add_argument(
             "--num_adj_slices",
-            default=1, # default = 5
+            default=5, # default = 5
             type=int,
             help="Number of adjacent slices",
         )
