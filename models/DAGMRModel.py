@@ -100,19 +100,20 @@ def ExtractImagePatches(images, ksizes, strides, rates, padding='same'):
 """
 Graph model
 """
-def create_8_connected_grid(height, width):
+def create_8_connected_grid(height, width, device=None):
     """
     Create an 8-connected grid graph for a 2D feature map efficiently.
     Args:
         height (int): Height of the grid.
         width (int): Width of the grid.
+        device (torch.device, optional): Device to place the graph on.
     Returns:
         torch.Tensor: edge_index of shape [2, num_edges], defining an 8-connected graph.
     """
     num_nodes = height * width
 
     # Generate linear indices for the grid
-    indices = torch.arange(num_nodes).reshape(height, width)
+    indices = torch.arange(num_nodes, device=device).reshape(height, width)
 
     # Define offsets for 8-connected neighbors
     neighbors = [
@@ -128,9 +129,9 @@ def create_8_connected_grid(height, width):
 
         # Mask out invalid edges (e.g., wrapping around the edges of the grid)
         if dr != 0:
-            rolled[(dr > 0) * torch.arange(height)[:dr], :] = -1
+            rolled[(dr > 0) * torch.arange(height, device=device)[:dr], :] = -1
         if dc != 0:
-            rolled[:, (dc > 0) * torch.arange(width)[:dc]] = -1
+            rolled[:, (dc > 0) * torch.arange(width, device=device)[:dc]] = -1
 
         edges.append(torch.stack([indices.flatten(), rolled.flatten()]))
 
@@ -141,9 +142,9 @@ def create_8_connected_grid(height, width):
 
     return edge_index
 
-class DynamicAttentionMechanism(nn.Module):
+class GraphConstructionModule(nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels, num_layers=3):
-        super(DynamicAttentionMechanism, self).__init__()
+        super(GraphConstructionModule, self).__init__()
         self.layers = nn.ModuleList()
         self.layers.append(GCNConv(in_channels, hidden_channels))
         for _ in range(num_layers - 2):
@@ -156,8 +157,9 @@ class DynamicAttentionMechanism(nn.Module):
         # Reshape input for GCN
         x = x.view(batch_size, channels, -1).permute(0, 2, 1)  # [B, HW, C]
 
-        # Create optimized 8-connected grid
-        edge_index = create_8_connected_grid(height, width).to(x.device)
+        # Ensure edge_index is on the same device as x
+        device = x.device
+        edge_index = create_8_connected_grid(height, width, device=device)
 
         # Apply GCN layers
         for layer in self.layers:
@@ -177,21 +179,21 @@ class M_GFAM(nn.Module):
         self.RBS2 = nn.Sequential(*RBS2)
 
         # stage 1 (3 heads)
-        self.c1_1 = DynamicAttentionMechanism(in_channels, in_channels, in_channels)
-        self.c1_2 = DynamicAttentionMechanism(in_channels, in_channels, in_channels)
-        self.c1_3 = DynamicAttentionMechanism(in_channels, in_channels, in_channels)
+        self.c1_1 = GraphConstructionModule(in_channels, in_channels, in_channels)
+        self.c1_2 = GraphConstructionModule(in_channels, in_channels, in_channels)
+        self.c1_3 = GraphConstructionModule(in_channels, in_channels, in_channels)
         self.c1_c = nn.Conv2d(in_channels * 3, in_channels, 1, 1, 0)
 
         # stage 2 (3 heads)
-        self.c2_1 = DynamicAttentionMechanism(in_channels, in_channels, in_channels)
-        self.c2_2 = DynamicAttentionMechanism(in_channels, in_channels, in_channels)
-        self.c2_3 = DynamicAttentionMechanism(in_channels, in_channels, in_channels)
+        self.c2_1 = GraphConstructionModule(in_channels, in_channels, in_channels)
+        self.c2_2 = GraphConstructionModule(in_channels, in_channels, in_channels)
+        self.c2_3 = GraphConstructionModule(in_channels, in_channels, in_channels)
         self.c2_c = nn.Conv2d(in_channels * 3, in_channels, 1, 1, 0)
 
         # stage 3 (3 heads)
-        self.c3_1 = DynamicAttentionMechanism(in_channels, in_channels, in_channels)
-        self.c3_2 = DynamicAttentionMechanism(in_channels, in_channels, in_channels)
-        self.c3_3 = DynamicAttentionMechanism(in_channels, in_channels, in_channels)
+        self.c3_1 = GraphConstructionModule(in_channels, in_channels, in_channels)
+        self.c3_2 = GraphConstructionModule(in_channels, in_channels, in_channels)
+        self.c3_3 = GraphConstructionModule(in_channels, in_channels, in_channels)
         self.c3_c = nn.Conv2d(in_channels * 3, in_channels, 1, 1, 0)
 
     def forward(self, x):
@@ -210,44 +212,36 @@ class M_GFAM(nn.Module):
 class DAGMR(nn.Module):
     def __init__(self, args, conv=default_conv):
         super(DAGMR, self).__init__()
-        # Define basic settings for grayscale input
-        n_resblocks = args['n_resblocks']
-        n_feats = args['n_feats']
-        kernel_size = 3
-        res_scale = args['res_scale']
-        # print(" res and feats and scale : " , n_resblocks,n_feats,res_scale)
-        # Head module (input channels for grayscale images is 1)
-        m_head = [conv(2, n_feats, kernel_size)]  # Adjust input channel to 1 for grayscale
+        self.n_resblocks = args['n_resblocks']
+        self.n_feats = args['n_feats']
+        self.kernel_size = 3
+        self.res_scale = args['res_scale']
 
-        # Body module
-        m_body = [
-            ResBlock(conv, n_feats, kernel_size, res_scale=res_scale
-                     )for _ in range(n_resblocks // 2)
-        ]
-        m_body.append(M_GFAM(n_feats))
-        for i in range(n_resblocks // 2):
-            m_body.append(ResBlock(conv, n_feats, kernel_size, res_scale=res_scale))
+        self.head = nn.Sequential(conv(2, self.n_feats, self.kernel_size))
 
-        m_body.append(conv(n_feats, n_feats, kernel_size))
+        self.body = nn.ModuleList([
+            ResBlock(conv, self.n_feats, self.kernel_size, res_scale=self.res_scale) 
+            for _ in range(self.n_resblocks)
+        ])
 
-        m_tail = [conv(n_feats, 2, kernel_size)] 
-        self.head = nn.Sequential(*m_head)
-        self.body = nn.Sequential(*m_body)
-        self.tail = nn.Sequential(*m_tail)
+        self.graph_layers = nn.ModuleList([
+            GraphConstructionModule(self.n_feats, self.n_feats, self.n_feats, num_layers=3)
+        ])
 
-    def forward(self, x):
-        # Pass the input through the network
-        # print("x shape :" , x.shape)
-        original_input = x.clone()
-        res = self.head(x)
-        res = self.body(res)
-        res = self.tail(res)
-        # Check if the residual addition is functioning correctly
-        output = original_input + res  # Residual connection
-        print("RR Output Shape:", output.shape)
-        print("RR Output Mean:", output.mean().item())
+        self.tail = nn.Sequential(conv(self.n_feats, 2, self.kernel_size))
+
+    def forward(self, x, image=None):
+        x = self.head(x)
+
+        for body_layer, graph_layer in zip(self.body, self.graph_layers):
+            x = body_layer(x)
+            x = graph_layer(x)
+
+        x = self.tail(x)
+        # print("RR Output Shape:", x.shape)
+        print("RR Output Mean:", x.mean().item())
         # print(" RR forward output : ", (x + res).shape)
-        return x + res  # Residual connection
+        return x
     
     def load_state_dict(self, state_dict, strict=True):
         own_state = self.state_dict()
