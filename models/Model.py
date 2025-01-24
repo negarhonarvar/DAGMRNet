@@ -692,7 +692,7 @@ class DAGMRNetworkModel(nn.Module):
             low_mem=low_mem,
 
         )
-        num_cascades = 12
+        num_cascades = 8
         print("Number of cascades : ",num_cascades)
         self.cascades = nn.ModuleList(
             [PromptMRBlock(DAGMRNet(2*num_adj_slices, 2*num_adj_slices, n_feat0, feature_dim, prompt_dim, len_prompt, prompt_size, n_enc_cab, n_dec_cab, n_skip_cab, n_bottleneck_cab, no_use_ca), num_adj_slices) for _ in range(num_cascades)]

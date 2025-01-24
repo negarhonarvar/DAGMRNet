@@ -160,12 +160,12 @@ class CmrxReconDataModule(pl.LightningDataModule):
                 "Can set test_sample_rate or test_volume_sample_rate, but not both."
             )
         # TODO: ugly but working code, mapping data will be loaded in CmrxReconSliceDataset
-        # self.data_path = data_path / 'Cine' / 'TrainingSet' / h5py_folder 
-        print("data_path:", data_path)
+        self.data_path = data_path / 'Cine' / 'TrainingSet' / h5py_folder 
+        # print("data_path:", data_path)
         # print("'Cine':", 'Cine')
         # print("'TrainingSet':", 'TrainingSet')
-        print("h5py_folder:", h5py_folder)
-        self.data_path = data_path.joinpath('Cine', h5py_folder)
+        # print("h5py_folder:", h5py_folder)
+        # self.data_path = data_path.joinpath('Cine', h5py_folder)
         
         self.challenge = challenge
         self.train_transform = train_transform

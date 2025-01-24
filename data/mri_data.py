@@ -313,15 +313,16 @@ class CmrxReconSliceDataset(torch.utils.data.Dataset):
             # AORTA_TRA :12888
             # TAGGING :16728
             # Dataset size :82308
-
-            self.raw_samples = raw_samples_aorta_sag*1.56
-            + raw_samples_aorta_tra*1.54
-            + raw_samples_tagging
-            + raw_samples_lvot*9.47 
-            + raw_samples_sax*1.19
-            + raw_samples_lax*3.12
-            + raw_samples_t1*2.28
-            + raw_samples_t2*6.85
+            self.raw_samples = (
+            raw_samples_aorta_sag * 1
+            + raw_samples_aorta_tra * 1
+            + raw_samples_tagging * 1
+            + raw_samples_lvot * 9
+            + raw_samples_sax * 1
+            + raw_samples_lax * 3
+            + raw_samples_t1 * 2
+            + raw_samples_t2 * 7
+                               )
             print(f"Dataset size :{len(self.raw_samples)}")
         # self.raw_samples = self.raw_samples[0:1000]  # for quick debug
 
