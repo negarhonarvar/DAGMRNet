@@ -393,6 +393,7 @@ class DAGMRNet(nn.Module):
 
         x = self.complex_to_chan_dim(x)
         x, mean, std = self.norm(x)
+        print(f"Input shape of dagl_model: {x.shape}")
         output = self.dagl_model(x)
         print(f"Output shape of dagl_model: {output.shape}")
         output = self.unnorm(output, mean, std)
@@ -692,7 +693,7 @@ class DAGMRNetworkModel(nn.Module):
             low_mem=low_mem,
 
         )
-        num_cascades = 12
+        num_cascades = 2
         print("Number of cascades : ",num_cascades)
         self.cascades = nn.ModuleList(
             [PromptMRBlock(DAGMRNet(2*num_adj_slices, 2*num_adj_slices, n_feat0, feature_dim, prompt_dim, len_prompt, prompt_size, n_enc_cab, n_dec_cab, n_skip_cab, n_bottleneck_cab, no_use_ca), num_adj_slices) for _ in range(num_cascades)]
@@ -712,13 +713,19 @@ class DAGMRNetworkModel(nn.Module):
         else:
             sens_maps = self.sens_net(masked_kspace, mask, num_low_frequencies)
         kspace_pred = masked_kspace.clone()
+        counter = 1
         for cascade in self.cascades:
-            print("**************************************Cascade started**********************************************")
+            print("**************************************Cascade", counter," started**********************************************")
             if self.use_checkpoint and self.training:
                 kspace_pred = torch.utils.checkpoint.checkpoint(
                 cascade, kspace_pred, masked_kspace, mask, sens_maps, use_reentrant=False)
             else:
                 kspace_pred = cascade(kspace_pred, masked_kspace, mask, sens_maps)
+            
+            counter += 1
+            if counter > 8 :
+                counter = 1
+            
 
         kspace_pred = torch.chunk(kspace_pred, self.num_adj_slices, dim=1)[
             self.center_slice]

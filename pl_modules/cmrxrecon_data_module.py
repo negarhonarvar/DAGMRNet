@@ -161,17 +161,17 @@ class CmrxReconDataModule(pl.LightningDataModule):
             )
         # TODO: ugly but working code, mapping data will be loaded in CmrxReconSliceDataset
         # self.data_path = data_path / 'Cine' / 'TrainingSet' / h5py_folder 
-        print("data_path:", data_path)
+        # print("data_path:", data_path)
         # print("'Cine':", 'Cine')
         # print("'TrainingSet':", 'TrainingSet')
-        print("h5py_folder:", h5py_folder)
+        # print("h5py_folder:", h5py_folder)
         self.data_path = data_path.joinpath('Cine', h5py_folder)
         
         self.challenge = challenge
         self.train_transform = train_transform
         self.val_transform = val_transform
         self.test_transform = test_transform
-        self.combine_train_val = combine_train_val
+        self.combine_train_val = False
         self.test_split = test_split
         self.test_path = test_path
         self.sample_rate = sample_rate
@@ -226,9 +226,10 @@ class CmrxReconDataModule(pl.LightningDataModule):
                     else volume_sample_rate
                 )
                 raw_sample_filter = self.test_filter
-
+        
         # if desired, combine train and val together for the train split
-        dataset: Union[CmrxReconSliceDataset, CombinedCmrxReconSliceDataset]
+        # dataset: Union[CmrxReconSliceDataset, CombinedCmrxReconSliceDataset]
+        
         if is_train and self.combine_train_val:
             data_paths = [
                 self.data_path / "train",
@@ -266,6 +267,13 @@ class CmrxReconDataModule(pl.LightningDataModule):
                 raw_sample_filter=raw_sample_filter,
             )
 
+         # Debug logs
+        print(f"DataLoader Partition: {data_partition}")
+        if data_partition == "train":
+            print(f"Using train dataset: {self.data_path / 'train'}")
+        elif data_partition == "val":
+            print(f"Using val dataset: {self.data_path / 'val'}")
+
         # ensure that entire volumes go to the same GPU in the ddp setting
         sampler = None
 
@@ -283,7 +291,8 @@ class CmrxReconDataModule(pl.LightningDataModule):
             sampler=sampler,
             shuffle=is_train if sampler is None else False,
         )
-
+        print(f"DataLoader Partition: {data_partition}")
+        print(f"Data Path: {data_path}")
         return dataloader
 
     
@@ -321,9 +330,11 @@ class CmrxReconDataModule(pl.LightningDataModule):
                 )
 
     def train_dataloader(self):
+        print("Creating train dataloader...")
         return self._create_data_loader(self.train_transform, data_partition="train")
 
     def val_dataloader(self):
+        print("Creating val dataloader...")
         return self._create_data_loader(self.val_transform, data_partition="val")
 
     def test_dataloader(self):
@@ -433,6 +444,7 @@ class CmrxReconDataModule(pl.LightningDataModule):
         )
         parser.add_argument(
             "--combine_train_val",
+            # default=False,
             action="store_true",
             help="Whether to combine train and val splits for training",
         )

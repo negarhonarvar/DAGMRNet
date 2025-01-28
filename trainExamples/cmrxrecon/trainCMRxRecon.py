@@ -1,11 +1,9 @@
 import os
 import sys
 import pathlib
-from argparse import ArgumentParser
-
 sys.path.insert(0, os.path.dirname(os.path.dirname(pathlib.Path(__file__).parent.absolute())))
 # os.environ["TORCH_DISTRIBUTED_USE_LIBUV"] = "0"
-
+from argparse import ArgumentParser
 from data.transforms import DAGMRNetDataTransform
 from pl_modules.cmrxrecon_data_module import CmrxReconDataModule
 from pl_modules.DAGMRNet_module import DAGMRNetModule
@@ -16,6 +14,7 @@ import torch
 
 # clearing gpu cache in case it is occupied by previous run data
 torch.cuda.empty_cache()
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
 
@@ -42,7 +41,7 @@ def cli_main(args):
         train_transform=train_transform,
         val_transform=val_transform,
         test_transform=test_transform,
-        combine_train_val=args.combine_train_val, # combine train and val data for train
+        combine_train_val=False, # combine train and val data for train
         test_split=args.test_split,
         test_path=args.test_path,
         sample_rate=0.01,
@@ -87,13 +86,16 @@ def cli_main(args):
     # ------------
     # trainer
     # ------------
-
+    trainer = pl.Trainer(gpus=1)
     trainer = pl.Trainer.from_argparse_args(
             args ,
             log_every_n_steps=1,
-            accelerator='gpu',  # gpu
+            accelerator='gpu',
             logger = logger ,
+            # strategy="single_device",  # what distributed version to use
             # pin_memory=True ,
+            val_check_interval=0.95,
+            limit_val_batches = 0.5,
             profiler="simple")
 
     # ------------
@@ -189,7 +191,7 @@ def build_args():
         num_cascades=12,  # number of unrolled iterations
         num_adj_slices=1,  # number of adjacent slices
 
-        n_feat0=48,  # number of top-level channels for PromptUnet , default value was 48
+        n_feat0=16,  # number of top-level channels for PromptUnet , default value was 48
         feature_dim = [72, 96, 120], # [72, 96, 120]
         prompt_dim = [24, 48, 72], # [24, 48, 72]
 
@@ -214,7 +216,7 @@ def build_args():
     parser.set_defaults(
         gpus=1,  # number of gpus to use
         replace_sampler_ddp=False,  # this is necessary for volume dispatch during val
-        strategy="dp",  # what distributed version to use
+        # strategy="dp",  # what distributed version to use
         # strategy=None,  
         seed=42,  # random seed
         deterministic=False,  # makes things slower, but deterministic
@@ -222,6 +224,7 @@ def build_args():
         # default_root_dir=default_root_dir,  # directory for logs and checkpoints
         max_epochs=12,  # max number of epochs
         gradient_clip_val=0.01,
+        check_val_every_n_epoch=1,
     )
 
     args = parser.parse_args()

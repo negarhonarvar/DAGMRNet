@@ -220,26 +220,27 @@ class CmrxReconSliceDataset(torch.utils.data.Dataset):
             for i in range(len(folders)):
                 files += list(folders[i].iterdir())
 
-            # # Mapping = T1 - T2 
-            folders = list(Path(str(root).replace('Cine','Mapping')).iterdir())
-            files2 = []
-            for i in range(len(folders)):
-                 files2 += list(folders[i].iterdir())
+            # # # Mapping = T1 - T2 
+            # folders = list(Path(str(root).replace('Cine','Mapping')).iterdir())
+            # files2 = []
+            # for i in range(len(folders)):
+            #      files2 += list(folders[i].iterdir())
 
-            # Aorta = SAG - TRA 
-            folders = list(Path(str(root).replace('Cine','Aorta')).iterdir())
-            files3 = []
-            for i in range(len(folders)):
-                files3 += list(folders[i].iterdir())
+            # # Aorta = SAG - TRA 
+            # folders = list(Path(str(root).replace('Cine','Aorta')).iterdir())
+            # files3 = []
+            # for i in range(len(folders)):
+            #     files3 += list(folders[i].iterdir())
 
-            # Tagging = Tagging
-            folders = list(Path(str(root).replace('Cine','Tagging')).iterdir())
-            files4 = []
-            for i in range(len(folders)):
-                files4 += list(folders[i].iterdir())
+            # # Tagging = Tagging
+            # folders = list(Path(str(root).replace('Cine','Tagging')).iterdir())
+            # files4 = []
+            # for i in range(len(folders)):
+            #     files4 += list(folders[i].iterdir())
 
 
-            files = sorted(files+files2+files3+files4)
+            # files = sorted(files+files2+files3+files4)
+            files = sorted(files)
 
             for fname in sorted(files): 
                 with h5py.File(fname,'r') as hf:
@@ -295,14 +296,14 @@ class CmrxReconSliceDataset(torch.utils.data.Dataset):
                 elif 'tagging' in fname_ii:
                     raw_samples_tagging.append(ii)
         
-            print(f"T1 :{len(raw_samples_t1)}")
-            print(f"T2 :{len(raw_samples_t2)}")
+            # print(f"T1 :{len(raw_samples_t1)}")
+            # print(f"T2 :{len(raw_samples_t2)}")
             print(f"LAX :{len(raw_samples_lax)}")
             print(f"SAX :{len(raw_samples_sax)}")
             print(f"LVOT :{len(raw_samples_lvot)}")
-            print(f"AORTA_SAG :{len(raw_samples_aorta_sag)}")
-            print(f"AORTA_TRA :{len(raw_samples_aorta_tra)}")
-            print(f"TAGGING :{len(raw_samples_tagging)}")
+            # print(f"AORTA_SAG :{len(raw_samples_aorta_sag)}")
+            # print(f"AORTA_TRA :{len(raw_samples_aorta_tra)}")
+            # print(f"TAGGING :{len(raw_samples_tagging)}")
 
             # T1 :8712
             # T2 :2904
@@ -314,14 +315,23 @@ class CmrxReconSliceDataset(torch.utils.data.Dataset):
             # TAGGING :16728
             # Dataset size :82308
 
-            self.raw_samples = raw_samples_aorta_sag*1.56
-            + raw_samples_aorta_tra*1.54
-            + raw_samples_tagging
-            + raw_samples_lvot*9.47 
-            + raw_samples_sax*1.19
-            + raw_samples_lax*3.12
-            + raw_samples_t1*2.28
-            + raw_samples_t2*6.85
+            # self.raw_samples = (
+            # raw_samples_aorta_sag * 1
+            # + raw_samples_aorta_tra * 1
+            # + raw_samples_tagging * 1
+            # + raw_samples_lvot * 9
+            # + raw_samples_sax * 1
+            # + raw_samples_lax * 3
+            # + raw_samples_t1 * 2
+            # + raw_samples_t2 * 7
+            #                    )
+            # print(f"Dataset size :{len(self.raw_samples)}")
+
+            self.raw_samples = (
+            raw_samples_lvot 
+            + raw_samples_sax 
+            + raw_samples_lax
+                               )
             print(f"Dataset size :{len(self.raw_samples)}")
         # self.raw_samples = self.raw_samples[0:1000]  # for quick debug
 

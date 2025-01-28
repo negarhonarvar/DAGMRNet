@@ -1,5 +1,5 @@
 from argparse import ArgumentParser
-
+import numpy as np
 import fastmri
 import torch
 from fastmri.data import transforms
@@ -20,7 +20,7 @@ class DAGMRNetModule(MriModule):
     def __init__(
         self,
         num_cascades: int = 12, # 12
-        num_adj_slices: int = 5, # 5
+        num_adj_slices: int = 1, # 5
         n_feat0: int =48, # 48
         feature_dim: List[int] = [72, 96, 120], # [72, 96, 120]
         prompt_dim: List[int] = [24, 48, 72], # [24, 48, 72]
@@ -141,92 +141,251 @@ class DAGMRNetModule(MriModule):
         self.loss = fastmri.SSIMLoss()
 
     def forward(self, masked_kspace, mask, num_low_frequencies):
-        return self.promptmr(masked_kspace, mask, num_low_frequencies)
-
-
-
+        img_pred = self.promptmr(masked_kspace, mask, num_low_frequencies)
+        img_zf = fastmri.ifft2c(masked_kspace)  # Include zero-filled reconstruction
+        print(f"Zero-filled image shape: {img_zf.shape}, Min: {img_zf.min()}, Max: {img_zf.max()}")
+        return {'img_pred': img_pred, 'img_zf': img_zf}
+    
     def training_step(self, batch, batch_idx):
+        print ('\n')
+        print("this is training step")
+        # print ('\n')
+        output_dict = self(batch.masked_kspace, batch.mask, batch.num_low_frequencies)
+        output = output_dict['img_pred']
+        target, output = transforms.center_crop_to_smallest(
+            batch.target, output)
 
-        output = self(batch.masked_kspace, batch.mask, batch.num_low_frequencies)
+        loss = self.loss(
+            output.unsqueeze(1), target.unsqueeze(1), data_range=batch.max_value
+        )
+        # self.log("tloss", loss, prog_bar=True)
 
-        target, output = transforms.center_crop_to_smallest(batch.target, output)
-        loss = self.loss(output.unsqueeze(1), target.unsqueeze(1), data_range=batch.max_value)
-
-        self.log("train_loss", loss)
-
-        # Convert to numpy arrays
         output_np = output.squeeze().cpu().detach().numpy()
         target_np = target.squeeze().cpu().detach().numpy()
 
-        # Normalize the images to range [0, 1] if they are not in this range already
-        output_np = (output_np - output_np.min()) / (output_np.max() - output_np.min())
-        target_np = (target_np - target_np.min()) / (target_np.max() - target_np.min())
+        print(f"Output min: {output_np.min()}, max: {output_np.max()}")
+        print(f"Target min: {target_np.min()}, max: {target_np.max()}")
+
+        if output_np.max() != output_np.min() and target_np.max() != target_np.min():
+                output_np = (output_np - output_np.min()) / (output_np.max() - output_np.min())
+                target_np = (target_np - target_np.min()) / (target_np.max() - target_np.min())
+        else:
+                print("Normalization skipped due to constant values!")
+                output_np = np.zeros_like(output_np)
+                target_np = np.zeros_like(target_np)
 
         # Calculate PSNR and SSIM metrics for training
         psnr_value = psnr(output_np, target_np, data_range=1.0)
         ssim_value = ssim(output_np, target_np, data_range=1.0)
 
-        # Log the PSNR and SSIM metrics
-        self.log("train_psnr", psnr_value, prog_bar=True)
-        self.log("train_ssim", ssim_value, prog_bar=True)
+        # Debugging: Print PSNR and SSIM values
+        print(f"PSNR: {psnr_value}, SSIM: {ssim_value}")
 
+        # Log the PSNR and SSIM metrics
+        self.log("tPSNR", psnr_value, on_step=True, on_epoch=True, prog_bar=True)
+        self.log("tSSIM", ssim_value, on_step=True, on_epoch=True, prog_bar=True)
+
+        ##! raise error if loss is nan
+        if torch.isnan(loss):
+            raise ValueError(f'nan loss on {batch.fname} of slice {batch.slice_num}')
         return loss
 
-    def validation_step(self, batch, batch_idx):
-        output = self.forward(batch.masked_kspace, batch.mask, batch.num_low_frequencies)
-        target, output = transforms.center_crop_to_smallest(batch.target, output)
+    # def training_step(self, batch, batch_idx):
+    #     print(f"Training step for this batch started.")
+        
+    #     try:
+    #         output = self(batch.masked_kspace, batch.mask, batch.num_low_frequencies)
+    #         target, output = transforms.center_crop_to_smallest(batch.target, output)
+            
+    #         if torch.isnan(output).any() or torch.isinf(output).any():
+    #             raise ValueError(f"Output contains NaN or inf at batch .")
+            
+    #         loss = self.loss(output.unsqueeze(1), target.unsqueeze(1), data_range=batch.max_value)
+            
+    #         if torch.isnan(loss) or torch.isinf(loss):
+    #             raise ValueError(f"Loss is NaN or inf at batch .")
+            
+    #         self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
 
-        loss = self.loss(output.unsqueeze(1), target.unsqueeze(1), data_range=batch.max_value)
-        self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+    #         output_np = output.squeeze().cpu().detach().numpy()
+    #         target_np = target.squeeze().cpu().detach().numpy()
+
+    #         print(f"Output min: {output_np.min()}, max: {output_np.max()}")
+    #         print(f"Target min: {target_np.min()}, max: {target_np.max()}")
+
+    #         if output_np.max() != output_np.min() and target_np.max() != target_np.min():
+    #             output_np = (output_np - output_np.min()) / (output_np.max() - output_np.min())
+    #             target_np = (target_np - target_np.min()) / (target_np.max() - target_np.min())
+    #         else:
+    #             print("Normalization skipped due to constant values!")
+    #             output_np = np.zeros_like(output_np)
+    #             target_np = np.zeros_like(target_np)
+
+    #         # Calculate PSNR and SSIM metrics for training
+    #         psnr_value = psnr(output_np, target_np, data_range=1.0)
+    #         ssim_value = ssim(output_np, target_np, data_range=1.0)
+
+    #         # Debugging: Print PSNR and SSIM values
+    #         print(f"PSNR: {psnr_value}, SSIM: {ssim_value}")
+
+    #         # Log the PSNR and SSIM metrics
+    #         self.log("train_psnr", psnr_value, on_step=True, on_epoch=True, prog_bar=True)
+    #         self.log("train_ssim", ssim_value, on_step=True, on_epoch=True, prog_bar=True)
+
+    #         return loss
+        
+        # except Exception as e:
+        #     print(f"Error in training_step for batch {batch_idx}: {e}")
+        #     raise
+    
+
+    def validation_step(self, batch, batch_idx):
+        
+        print ('\n')
+        print("this is validation step")
+        # print ('\n')
+        output_dict = self(batch.masked_kspace, batch.mask, batch.num_low_frequencies)
+        output = output_dict['img_pred']
+        img_zf = output_dict['img_zf']
+        target, output = transforms.center_crop_to_smallest(
+            batch.target, output)
+        _, img_zf = transforms.center_crop_to_smallest(
+            batch.target, img_zf)
+        val_loss = self.loss(
+                output.unsqueeze(1), target.unsqueeze(1), data_range=batch.max_value
+            )
+        val_loss = self.loss(output.unsqueeze(1), target.unsqueeze(1), data_range=batch.max_value)
+             
+        # Log the validation loss
+        self.log("val_loss", val_loss, on_step=False, on_epoch=True, prog_bar=True)
 
         # Convert to numpy arrays
         output_np = output.squeeze().cpu().detach().numpy()
         target_np = target.squeeze().cpu().detach().numpy()
 
+        # Debugging: Print min and max values
+        print(f"Output min: {output_np.min()}, max: {output_np.max()}")
+        print(f"Target min: {target_np.min()}, max: {target_np.max()}")
+
         # Normalize the images to range [0, 1] if they are not in this range already
-        output_np = (output_np - output_np.min()) / (output_np.max() - output_np.min())
-        target_np = (target_np - target_np.min()) / (target_np.max() - target_np.min())
+        if output_np.max() != output_np.min() and target_np.max() != target_np.min():
+                output_np = (output_np - output_np.min()) / (output_np.max() - output_np.min())
+                target_np = (target_np - target_np.min()) / (target_np.max() - target_np.min())
+        else:
+                print("Normalization skipped due to constant values!")
+                output_np = np.zeros_like(output_np)
+                target_np = np.zeros_like(target_np)
 
         # Calculate PSNR and SSIM metrics for validation
         psnr_value = psnr(output_np, target_np, data_range=1.0)
         ssim_value = ssim(output_np, target_np, data_range=1.0)
 
+        # Debugging: Print PSNR and SSIM values
+        print(f"Validation PSNR: {psnr_value}, SSIM: {ssim_value}")
+
         # Log the PSNR and SSIM metrics for validation
-        self.log("val_psnr", psnr_value, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log("val_ssim", ssim_value, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        
+        self.log("val_PSNR", psnr_value, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("val_SSIM", ssim_value, on_step=False, on_epoch=True, prog_bar=True)
+        cc = batch.masked_kspace.shape[1]
+        centered_coil_visual = torch.log(1e-10+torch.view_as_complex(batch.masked_kspace[:,cc//2]).abs())
         return {
             "batch_idx": batch_idx,
             "fname": batch.fname,
             "slice_num": batch.slice_num,
             "max_value": batch.max_value,
+            "img_zf":   img_zf,
+            "mask": centered_coil_visual, 
             "output": output,
             "target": target,
-            "val_loss": loss,
+            "val_loss": val_loss,
             "val_psnr": psnr_value,
             "val_ssim": ssim_value,
-    }
-
-
-    def test_step(self, batch, batch_idx):
-        output = self(batch.masked_kspace, batch.mask,
-                      batch.num_low_frequencies)
-
-        # check for FLAIR 203
-        if output.shape[-1] < batch.crop_size[1]:
-            crop_size = (output.shape[-1], output.shape[-1])
-        else:
-            crop_size = batch.crop_size
-
-        output = transforms.center_crop(output, crop_size)
-
-        return {
-            "fname": batch.fname,
-            "slice": batch.slice_num,
-            "output": output.cpu().numpy(),
         }
 
+    # def validation_step(self, batch, batch_idx):
+        
+    #     print(f"Validation step for batch {batch_idx} started.")
+        
+    #     try:
+    #         output = self(batch.masked_kspace, batch.mask, batch.num_low_frequencies)
+    #         target, output = transforms.center_crop_to_smallest(batch.target, output)
+            
+    #         # Check for NaN or inf in output
+    #         if torch.isnan(output).any() or torch.isinf(output).any():
+    #             raise ValueError(f"Output contains NaN or inf at batch {batch_idx}.")
+            
+    #         val_loss = self.loss(output.unsqueeze(1), target.unsqueeze(1), data_range=batch.max_value)
+            
+    #         # Check for NaN or inf in loss
+    #         if torch.isnan(val_loss) or torch.isinf(val_loss):
+    #             raise ValueError(f"Loss is NaN or inf at batch {batch_idx}.")
+            
+    #         # Log the validation loss
+    #         self.log("val_loss", val_loss, on_step=False, on_epoch=True, prog_bar=True)
 
+    #         # Convert to numpy arrays
+    #         output_np = output.squeeze().cpu().detach().numpy()
+    #         target_np = target.squeeze().cpu().detach().numpy()
+
+    #         # Debugging: Print min and max values
+    #         print(f"Output min: {output_np.min()}, max: {output_np.max()}")
+    #         print(f"Target min: {target_np.min()}, max: {target_np.max()}")
+
+    #         # Normalize the images to range [0, 1] if they are not in this range already
+    #         if output_np.max() != output_np.min() and target_np.max() != target_np.min():
+    #             output_np = (output_np - output_np.min()) / (output_np.max() - output_np.min())
+    #             target_np = (target_np - target_np.min()) / (target_np.max() - target_np.min())
+    #         else:
+    #             print("Normalization skipped due to constant values!")
+    #             output_np = np.zeros_like(output_np)
+    #             target_np = np.zeros_like(target_np)
+
+    #         # Calculate PSNR and SSIM metrics for validation
+    #         psnr_value = psnr(output_np, target_np, data_range=1.0)
+    #         ssim_value = ssim(output_np, target_np, data_range=1.0)
+
+    #         # Debugging: Print PSNR and SSIM values
+    #         print(f"Validation PSNR: {psnr_value}, SSIM: {ssim_value}")
+
+    #         # Log the PSNR and SSIM metrics for validation
+    #         self.log("val_PSNR", psnr_value, on_step=False, on_epoch=True, prog_bar=True)
+    #         self.log("val_SSIM", ssim_value, on_step=False, on_epoch=True, prog_bar=True)
+
+    #         return {
+    #             "batch_idx": batch_idx,
+    #             "fname": batch.fname,
+    #             "slice_num": batch.slice_num,
+    #             "max_value": batch.max_value,
+    #             "output": output,
+    #             "target": target,
+    #             "val_loss": val_loss,
+    #             "val_psnr": psnr_value,
+    #             "val_ssim": ssim_value,
+    #         }
+        
+    #     except Exception as e:
+    #         print(f"Error in validation_step for batch {batch_idx}: {e}")
+    #         raise
+
+    def test_step(self, batch, batch_idx, dataloader_idx=0):
+        output_dict = self(batch.masked_kspace, batch.mask, batch.num_low_frequencies, batch.mask_type,
+                           compute_sens_per_coil=self.compute_sens_per_coil)
+        output = output_dict['img_pred']
+
+        crop_size = batch.crop_size 
+        crop_size = [crop_size[0][0], crop_size[1][0]] # if batch_size>1
+        # detect FLAIR 203
+        if output.shape[-1] < crop_size[1]:
+            crop_size = (output.shape[-1], output.shape[-1])
+        output = transforms.center_crop(output, crop_size)
+
+        num_slc = batch.num_slc
+        return {
+            'output': output.cpu(), 
+            'slice_num': batch.slice_num, 
+            'fname': batch.fname,
+            'num_slc':  num_slc
+        }
     # def configure_optimizers(self):
     #         optim = torch.optim.AdamW(
     #             self.parameters(), lr=self.lr, weight_decay=self.weight_decay
