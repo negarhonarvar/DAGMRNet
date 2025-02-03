@@ -6,25 +6,27 @@ This repository contains the pytorch implementation of DAGMRNet, a comprehensive
 
 This model utilizes a " Dynamic Attentive Graph Learning " model as a denoising network for reconstructing cardiac MRI based on " Self Similarity " Image prior. The Architecture of our proposed model is shown below:
 
-< img src="https://github.com/user-attachments/assets/9e9be2d9-b354-486d-aaf7-f3fcd3062938" width="400">
+<p align = "center">
+   <img src="https://github.com/user-attachments/assets/30f8b733-4845-4fbe-b42b-ede9e59f98c4" width = "400" >
+</p>
 
+## Prerequisites 📋
 
-## Installation and Data Preparation
+Required libraries and dependencies are listed as a code block inside the requirements.txt file. run the code below and install them:
 
-Check install.md to install the dependencies.
+    pip install -r requirements.txt
 
-also can request the interpreter to be sent to you
+## Dataset :anatomical_heart:
 
-adding data perpretation, link to miccai
+This model is trained on Training Set of Multi Coil Cine accelerated cardiac MRI's of CMRxRecon Dataset and evaluated on its Validation Set datas, which are intended for CMR reconstruction evaluation. Check the [Link](https://cmrxrecon.github.io/2024/Home.html)
+ and request for the dataset.
 
-## Training/Inference Codes & Pretrained models
+## Training/Inference Codes & Pretrained models :brain:
 
-google drive link
+Current weights of model are accessible in [Best Weights Directory](https://github.com/negarhonarvar/DAGMRNet/tree/main/BestWeights) Directory of this repository.
+Set the variable
 
-## Update
+    args.mode == "test"
+    
+and enjoy reconstruction your CMR images!
 
-also add other important sections
-
-## Acknowledgements
-
-promptMR, DAGL, E2E-varnet, HUMUS-Net, PromptIR, CMRIxRecon
