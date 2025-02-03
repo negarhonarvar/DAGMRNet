@@ -46,7 +46,7 @@ def cli_main(args):
         test_path=args.test_path,
         sample_rate=0.01,
         batch_size=1,
-        num_workers=12,
+        num_workers=8,
         distributed_sampler=(args.strategy in (
             "ddp_find_unused_parameters_false", "ddp", "ddp_cpu")),
     )
@@ -121,7 +121,7 @@ def build_args():
     batch_size = 1
 
     # set defaults based on optional directory config
-    data_path = pathlib.Path(r"D:\HPC\CMRxRecon2024\home2\Raw_data\MICCAIChallenge2024\ChallengeData\MultiCoil")
+    data_path = pathlib.Path(r"H:\CMRxRecon2024\home2\Raw_data\MICCAIChallenge2024\ChallengeData\MultiCoil")
     # data_path = pathlib.Path(r"D:\\CMRxRecon2023\\MultiCoil")
 
     # data_path = "D:\\CMRxRecon2023\\MultiCoil"
