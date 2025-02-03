@@ -9,7 +9,9 @@ This model utilizes a " Dynamic Attentive Graph Learning " model as a denoising 
 <p align = "center">
    <img src="https://github.com/user-attachments/assets/30f8b733-4845-4fbe-b42b-ede9e59f98c4" width = "400" >
 </p>
+
 Check the Readme.md of [model](https://github.com/negarhonarvar/DAGMRNet/tree/main/models) Directory for more details.
+
 ## Prerequisites 📋
 
 Required libraries and dependencies are listed as a code block inside the requirements.txt file. run the code below and install them:
