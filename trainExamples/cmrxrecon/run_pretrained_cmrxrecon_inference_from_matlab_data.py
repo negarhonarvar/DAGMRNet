@@ -106,7 +106,7 @@ def predict(f, num_cascades=12, model_path = '', bs1 = 1, stage=1, center_crop=F
 
     state_dict = torch.load(model_path)['state_dict']
     state_dict.pop('loss.w')
-    state_dict = {k.replace('promptmr.', ''): v for k, v in state_dict.items()}
+    state_dict = {k.replace('DAGMRNet.', ''): v for k, v in state_dict.items()}
     model1.load_state_dict(state_dict)
     model1.eval()
     model1.to(device)

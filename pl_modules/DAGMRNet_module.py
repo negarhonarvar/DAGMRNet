@@ -10,7 +10,6 @@ from skimage.metrics import structural_similarity as ssim
 from skimage.metrics import peak_signal_noise_ratio as psnr
 
 
-
 class DAGMRNetModule(MriModule):
     """
     Training module.
@@ -18,45 +17,45 @@ class DAGMRNetModule(MriModule):
     """
 
     def __init__(
-        self,
-        num_cascades: int = 12, # 12
-        num_adj_slices: int = 1, # 5
-        n_feat0: int =48, # 48
-        feature_dim: List[int] = [72, 96, 120], # [72, 96, 120]
-        prompt_dim: List[int] = [24, 48, 72], # [24, 48, 72]
-        sens_n_feat0: int =24, # 24
-        sens_feature_dim: List[int] = [36, 48, 60], # [36, 48, 60]
-        sens_prompt_dim: List[int] = [12 , 24, 36], # [12, 24, 36]
-        len_prompt: List[int] = [5, 5, 5],
-        prompt_size: List[int] = [64, 32, 16], # =[64, 32, 16]
-        n_enc_cab: List[int] = [1, 1, 1], # [2, 3, 3]
-        n_dec_cab: List[int] = [1, 1, 1], # [2, 2, 3]
-        n_skip_cab: List[int] = [1, 1, 1],
-        n_bottleneck_cab: int = 3,
-        no_use_ca: bool = False,
-        lr: float = 0.0002,
-        lr_step_size: int = 11,
-        lr_gamma: float = 0.1,
-        weight_decay: float = 0.01,
-        use_checkpoint: bool = False,
-        low_mem: bool = True,
-        dagl_config = {
-            'scale': 2,  # scaling factor
-            'n_resblocks': 16,  # number of residual blocks , 16
-            'n_feats': 64,  # number of feature maps , 64
-            'rgb_range': 255,  # range for RGB values
-            'res_scale': 1.0,  # scaling factor for residuals
-            'chop': True,  # whether to use memory-efficient processing
-            'self_ensemble': False,  # whether to use self-ensemble method
-            'cpu': False,  # whether to run on CPU
-            'n_GPUs': 1,  # number of GPUs
-            'save_models': False,  # whether to save intermediate models
-            'pre_train': '',  # path to pre-trained model, if any
-            'resume': 0,  # resume training from a checkpoint
-            'seed': 42,  # random seed for reproducibility
-            'print_model': False,  # whether to print the model details
-                     },
-        **kwargs,
+            self,
+            num_cascades: int = 12,  # 12
+            num_adj_slices: int = 1,  # 5
+            n_feat0: int = 48,  # 48
+            feature_dim: List[int] = [72, 96, 120],  # [72, 96, 120]
+            prompt_dim: List[int] = [24, 48, 72],  # [24, 48, 72]
+            sens_n_feat0: int = 24,  # 24
+            sens_feature_dim: List[int] = [36, 48, 60],  # [36, 48, 60]
+            sens_prompt_dim: List[int] = [12, 24, 36],  # [12, 24, 36]
+            len_prompt: List[int] = [5, 5, 5],
+            prompt_size: List[int] = [64, 32, 16],  # =[64, 32, 16]
+            n_enc_cab: List[int] = [1, 1, 1],  # [2, 3, 3]
+            n_dec_cab: List[int] = [1, 1, 1],  # [2, 2, 3]
+            n_skip_cab: List[int] = [1, 1, 1],
+            n_bottleneck_cab: int = 3,
+            no_use_ca: bool = False,
+            lr: float = 0.0002,
+            lr_step_size: int = 11,
+            lr_gamma: float = 0.1,
+            weight_decay: float = 0.01,
+            use_checkpoint: bool = False,
+            low_mem: bool = True,
+            dagl_config={
+                'scale': 2,  # scaling factor
+                'n_resblocks': 16,  # number of residual blocks , 16
+                'n_feats': 64,  # number of feature maps , 64
+                'rgb_range': 255,  # range for RGB values
+                'res_scale': 1.0,  # scaling factor for residuals
+                'chop': True,  # whether to use memory-efficient processing
+                'self_ensemble': False,  # whether to use self-ensemble method
+                'cpu': False,  # whether to run on CPU
+                'n_GPUs': 1,  # number of GPUs
+                'save_models': False,  # whether to save intermediate models
+                'pre_train': '',  # path to pre-trained model, if any
+                'resume': 0,  # resume training from a checkpoint
+                'seed': 42,  # random seed for reproducibility
+                'print_model': False,  # whether to print the model details
+            },
+            **kwargs,
     ):
         """
         Args:
@@ -122,20 +121,20 @@ class DAGMRNetModule(MriModule):
             num_cascades=self.num_cascades,
             num_adj_slices=self.num_adj_slices,
             n_feat0=self.n_feat0,
-            feature_dim = self.feature_dim,
-            prompt_dim = self.prompt_dim,
+            feature_dim=self.feature_dim,
+            prompt_dim=self.prompt_dim,
             sens_n_feat0=self.sens_n_feat0,
-            sens_feature_dim = self.sens_feature_dim,
-            sens_prompt_dim = self.sens_prompt_dim,
-            len_prompt = self.len_prompt,
-            prompt_size = self.prompt_size,
-            n_enc_cab = self.n_enc_cab,
-            n_dec_cab = self.n_dec_cab,
-            n_skip_cab = self.n_skip_cab,
-            n_bottleneck_cab = self.n_bottleneck_cab,
-            no_use_ca = self.no_use_ca,
+            sens_feature_dim=self.sens_feature_dim,
+            sens_prompt_dim=self.sens_prompt_dim,
+            len_prompt=self.len_prompt,
+            prompt_size=self.prompt_size,
+            n_enc_cab=self.n_enc_cab,
+            n_dec_cab=self.n_dec_cab,
+            n_skip_cab=self.n_skip_cab,
+            n_bottleneck_cab=self.n_bottleneck_cab,
+            no_use_ca=self.no_use_ca,
             use_checkpoint=self.use_checkpoint,
-            low_mem = self.low_mem
+            low_mem=self.low_mem
         )
 
         self.loss = fastmri.SSIMLoss()
@@ -143,11 +142,10 @@ class DAGMRNetModule(MriModule):
     def forward(self, masked_kspace, mask, num_low_frequencies):
         img_pred = self.promptmr(masked_kspace, mask, num_low_frequencies)
         img_zf = fastmri.ifft2c(masked_kspace)  # Include zero-filled reconstruction
-        print(f"Zero-filled image shape: {img_zf.shape}, Min: {img_zf.min()}, Max: {img_zf.max()}")
         return {'img_pred': img_pred, 'img_zf': img_zf}
-    
+
     def training_step(self, batch, batch_idx):
-        print ('\n')
+        print('\n')
         print("this is training step")
         # print ('\n')
         output_dict = self(batch.masked_kspace, batch.mask, batch.num_low_frequencies)
@@ -167,21 +165,17 @@ class DAGMRNetModule(MriModule):
         print(f"Target min: {target_np.min()}, max: {target_np.max()}")
 
         if output_np.max() != output_np.min() and target_np.max() != target_np.min():
-                output_np = (output_np - output_np.min()) / (output_np.max() - output_np.min())
-                target_np = (target_np - target_np.min()) / (target_np.max() - target_np.min())
+            output_np = (output_np - output_np.min()) / (output_np.max() - output_np.min())
+            target_np = (target_np - target_np.min()) / (target_np.max() - target_np.min())
         else:
-                print("Normalization skipped due to constant values!")
-                output_np = np.zeros_like(output_np)
-                target_np = np.zeros_like(target_np)
+            print("Normalization skipped due to constant values!")
+            output_np = np.zeros_like(output_np)
+            target_np = np.zeros_like(target_np)
 
         # Calculate PSNR and SSIM metrics for training
         psnr_value = psnr(output_np, target_np, data_range=1.0)
         ssim_value = ssim(output_np, target_np, data_range=1.0)
-
-        # Debugging: Print PSNR and SSIM values
         print(f"PSNR: {psnr_value}, SSIM: {ssim_value}")
-
-        # Log the PSNR and SSIM metrics
         self.log("tPSNR", psnr_value, on_step=True, on_epoch=True, prog_bar=True)
         self.log("tSSIM", ssim_value, on_step=True, on_epoch=True, prog_bar=True)
 
@@ -190,58 +184,9 @@ class DAGMRNetModule(MriModule):
             raise ValueError(f'nan loss on {batch.fname} of slice {batch.slice_num}')
         return loss
 
-    # def training_step(self, batch, batch_idx):
-    #     print(f"Training step for this batch started.")
-        
-    #     try:
-    #         output = self(batch.masked_kspace, batch.mask, batch.num_low_frequencies)
-    #         target, output = transforms.center_crop_to_smallest(batch.target, output)
-            
-    #         if torch.isnan(output).any() or torch.isinf(output).any():
-    #             raise ValueError(f"Output contains NaN or inf at batch .")
-            
-    #         loss = self.loss(output.unsqueeze(1), target.unsqueeze(1), data_range=batch.max_value)
-            
-    #         if torch.isnan(loss) or torch.isinf(loss):
-    #             raise ValueError(f"Loss is NaN or inf at batch .")
-            
-    #         self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
-
-    #         output_np = output.squeeze().cpu().detach().numpy()
-    #         target_np = target.squeeze().cpu().detach().numpy()
-
-    #         print(f"Output min: {output_np.min()}, max: {output_np.max()}")
-    #         print(f"Target min: {target_np.min()}, max: {target_np.max()}")
-
-    #         if output_np.max() != output_np.min() and target_np.max() != target_np.min():
-    #             output_np = (output_np - output_np.min()) / (output_np.max() - output_np.min())
-    #             target_np = (target_np - target_np.min()) / (target_np.max() - target_np.min())
-    #         else:
-    #             print("Normalization skipped due to constant values!")
-    #             output_np = np.zeros_like(output_np)
-    #             target_np = np.zeros_like(target_np)
-
-    #         # Calculate PSNR and SSIM metrics for training
-    #         psnr_value = psnr(output_np, target_np, data_range=1.0)
-    #         ssim_value = ssim(output_np, target_np, data_range=1.0)
-
-    #         # Debugging: Print PSNR and SSIM values
-    #         print(f"PSNR: {psnr_value}, SSIM: {ssim_value}")
-
-    #         # Log the PSNR and SSIM metrics
-    #         self.log("train_psnr", psnr_value, on_step=True, on_epoch=True, prog_bar=True)
-    #         self.log("train_ssim", ssim_value, on_step=True, on_epoch=True, prog_bar=True)
-
-    #         return loss
-        
-        # except Exception as e:
-        #     print(f"Error in training_step for batch {batch_idx}: {e}")
-        #     raise
-    
-
     def validation_step(self, batch, batch_idx):
-        
-        print ('\n')
+
+        print('\n')
         print("this is validation step")
         # print ('\n')
         output_dict = self(batch.masked_kspace, batch.mask, batch.num_low_frequencies)
@@ -252,49 +197,51 @@ class DAGMRNetModule(MriModule):
         _, img_zf = transforms.center_crop_to_smallest(
             batch.target, img_zf)
         val_loss = self.loss(
-                output.unsqueeze(1), target.unsqueeze(1), data_range=batch.max_value
-            )
+            output.unsqueeze(1), target.unsqueeze(1), data_range=batch.max_value
+        )
         val_loss = self.loss(output.unsqueeze(1), target.unsqueeze(1), data_range=batch.max_value)
-             
-        # Log the validation loss
+        img_zf = torch.sqrt(torch.sum(img_zf ** 2, dim=1))
         self.log("val_loss", val_loss, on_step=False, on_epoch=True, prog_bar=True)
 
-        # Convert to numpy arrays
         output_np = output.squeeze().cpu().detach().numpy()
         target_np = target.squeeze().cpu().detach().numpy()
+        zf_np = img_zf.squeeze().cpu().detach().numpy()
 
-        # Debugging: Print min and max values
         print(f"Output min: {output_np.min()}, max: {output_np.max()}")
         print(f"Target min: {target_np.min()}, max: {target_np.max()}")
 
-        # Normalize the images to range [0, 1] if they are not in this range already
         if output_np.max() != output_np.min() and target_np.max() != target_np.min():
-                output_np = (output_np - output_np.min()) / (output_np.max() - output_np.min())
-                target_np = (target_np - target_np.min()) / (target_np.max() - target_np.min())
+            output_np = (output_np - output_np.min()) / (output_np.max() - output_np.min())
+            target_np = (target_np - target_np.min()) / (target_np.max() - target_np.min())
+            zf_np = (zf_np - zf_np.min()) / (zf_np.max() - zf_np.min())
         else:
-                print("Normalization skipped due to constant values!")
-                output_np = np.zeros_like(output_np)
-                target_np = np.zeros_like(target_np)
+            print("Normalization skipped due to constant values!")
+            output_np = np.zeros_like(output_np)
+            target_np = np.zeros_like(target_np)
+            zf_np = np.zeros_like(zf_np)
 
-        # Calculate PSNR and SSIM metrics for validation
+        # Calculate PSNR and SSIM 
         psnr_value = psnr(output_np, target_np, data_range=1.0)
         ssim_value = ssim(output_np, target_np, data_range=1.0)
+        # print(" ZF shape:", zf_np.shape, "Target Shape", target_np.shape)
+        zf_np = zf_np[:, :, 0]
+        psnr_zf = psnr(zf_np, target_np, data_range=1.0)
+        ssim_zf = ssim(zf_np, target_np, data_range=1.0)
 
-        # Debugging: Print PSNR and SSIM values
         print(f"Validation PSNR: {psnr_value}, SSIM: {ssim_value}")
+        print(f"PSNR (Zero-filled): {psnr_zf}, SSIM (Zero-filled): {ssim_zf}")
 
-        # Log the PSNR and SSIM metrics for validation
         self.log("val_PSNR", psnr_value, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val_SSIM", ssim_value, on_step=False, on_epoch=True, prog_bar=True)
         cc = batch.masked_kspace.shape[1]
-        centered_coil_visual = torch.log(1e-10+torch.view_as_complex(batch.masked_kspace[:,cc//2]).abs())
+        centered_coil_visual = torch.log(1e-10 + torch.view_as_complex(batch.masked_kspace[:, cc // 2]).abs())
         return {
             "batch_idx": batch_idx,
             "fname": batch.fname,
             "slice_num": batch.slice_num,
             "max_value": batch.max_value,
-            "img_zf":   img_zf,
-            "mask": centered_coil_visual, 
+            "img_zf": img_zf,
+            "mask": centered_coil_visual,
             "output": output,
             "target": target,
             "val_loss": val_loss,
@@ -302,78 +249,13 @@ class DAGMRNetModule(MriModule):
             "val_ssim": ssim_value,
         }
 
-    # def validation_step(self, batch, batch_idx):
-        
-    #     print(f"Validation step for batch {batch_idx} started.")
-        
-    #     try:
-    #         output = self(batch.masked_kspace, batch.mask, batch.num_low_frequencies)
-    #         target, output = transforms.center_crop_to_smallest(batch.target, output)
-            
-    #         # Check for NaN or inf in output
-    #         if torch.isnan(output).any() or torch.isinf(output).any():
-    #             raise ValueError(f"Output contains NaN or inf at batch {batch_idx}.")
-            
-    #         val_loss = self.loss(output.unsqueeze(1), target.unsqueeze(1), data_range=batch.max_value)
-            
-    #         # Check for NaN or inf in loss
-    #         if torch.isnan(val_loss) or torch.isinf(val_loss):
-    #             raise ValueError(f"Loss is NaN or inf at batch {batch_idx}.")
-            
-    #         # Log the validation loss
-    #         self.log("val_loss", val_loss, on_step=False, on_epoch=True, prog_bar=True)
-
-    #         # Convert to numpy arrays
-    #         output_np = output.squeeze().cpu().detach().numpy()
-    #         target_np = target.squeeze().cpu().detach().numpy()
-
-    #         # Debugging: Print min and max values
-    #         print(f"Output min: {output_np.min()}, max: {output_np.max()}")
-    #         print(f"Target min: {target_np.min()}, max: {target_np.max()}")
-
-    #         # Normalize the images to range [0, 1] if they are not in this range already
-    #         if output_np.max() != output_np.min() and target_np.max() != target_np.min():
-    #             output_np = (output_np - output_np.min()) / (output_np.max() - output_np.min())
-    #             target_np = (target_np - target_np.min()) / (target_np.max() - target_np.min())
-    #         else:
-    #             print("Normalization skipped due to constant values!")
-    #             output_np = np.zeros_like(output_np)
-    #             target_np = np.zeros_like(target_np)
-
-    #         # Calculate PSNR and SSIM metrics for validation
-    #         psnr_value = psnr(output_np, target_np, data_range=1.0)
-    #         ssim_value = ssim(output_np, target_np, data_range=1.0)
-
-    #         # Debugging: Print PSNR and SSIM values
-    #         print(f"Validation PSNR: {psnr_value}, SSIM: {ssim_value}")
-
-    #         # Log the PSNR and SSIM metrics for validation
-    #         self.log("val_PSNR", psnr_value, on_step=False, on_epoch=True, prog_bar=True)
-    #         self.log("val_SSIM", ssim_value, on_step=False, on_epoch=True, prog_bar=True)
-
-    #         return {
-    #             "batch_idx": batch_idx,
-    #             "fname": batch.fname,
-    #             "slice_num": batch.slice_num,
-    #             "max_value": batch.max_value,
-    #             "output": output,
-    #             "target": target,
-    #             "val_loss": val_loss,
-    #             "val_psnr": psnr_value,
-    #             "val_ssim": ssim_value,
-    #         }
-        
-    #     except Exception as e:
-    #         print(f"Error in validation_step for batch {batch_idx}: {e}")
-    #         raise
-
     def test_step(self, batch, batch_idx, dataloader_idx=0):
         output_dict = self(batch.masked_kspace, batch.mask, batch.num_low_frequencies, batch.mask_type,
                            compute_sens_per_coil=self.compute_sens_per_coil)
         output = output_dict['img_pred']
 
-        crop_size = batch.crop_size 
-        crop_size = [crop_size[0][0], crop_size[1][0]] # if batch_size>1
+        crop_size = batch.crop_size
+        crop_size = [crop_size[0][0], crop_size[1][0]]  # if batch_size>1
         # detect FLAIR 203
         if output.shape[-1] < crop_size[1]:
             crop_size = (output.shape[-1], output.shape[-1])
@@ -381,11 +263,12 @@ class DAGMRNetModule(MriModule):
 
         num_slc = batch.num_slc
         return {
-            'output': output.cpu(), 
-            'slice_num': batch.slice_num, 
+            'output': output.cpu(),
+            'slice_num': batch.slice_num,
             'fname': batch.fname,
-            'num_slc':  num_slc
+            'num_slc': num_slc
         }
+
     # def configure_optimizers(self):
     #         optim = torch.optim.AdamW(
     #             self.parameters(), lr=self.lr, weight_decay=self.weight_decay
@@ -406,7 +289,6 @@ class DAGMRNetModule(MriModule):
     #             'frequency': 1,       # How often to apply the scheduler
     #             }
     #         }
-
 
     def configure_optimizers(self):
         optim = torch.optim.AdamW(
@@ -431,66 +313,66 @@ class DAGMRNetModule(MriModule):
         # network params
         parser.add_argument(
             "--num_cascades",
-            default=12, # default = 12
+            default=12,  # default = 12
             type=int,
             help="Number of PromptMR cascades",
         )
         parser.add_argument(
             "--num_adj_slices",
-            default=5, # default = 5
+            default=5,  # default = 5
             type=int,
             help="Number of adjacent slices",
         )
         parser.add_argument(
             "--n_feat0",
-            default=48, # default 48
+            default=48,  # default 48
             type=int,
             help="Number of PromptUnet top-level feature channels in PromptMR blocks",
         )
         parser.add_argument(
             "--feature_dim",
-            default=[72, 96, 120], # default =[72, 96, 120] 
+            default=[72, 96, 120],  # default =[72, 96, 120]
             nargs="+",
             type=int,
             help="feature dim for each level in PromptUnet",
         )
         parser.add_argument(
             "--prompt_dim",
-            default=[24, 48, 72], # default =[24, 48, 72]
+            default=[24, 48, 72],  # default =[24, 48, 72]
             nargs="+",
             type=int,
             help="prompt dim for each level in PromptUnet in sensitivity map estimation (SME) network",
         )
         parser.add_argument(
             "--sens_n_feat0",
-            default=24 , # default = 24
+            default=24,  # default = 24
             type=int,
             help="Number of top-level feature channels for sense map estimation PromptUnet in PromptMR",
         )
         parser.add_argument(
             "--sens_feature_dim",
-            default=[36, 48, 60], # default =[36, 48, 60]
+            default=[36, 48, 60],  # default =[36, 48, 60]
             nargs="+",
             type=int,
             help="feature dim for each level in PromptUnet for sensitivity map estimation (SME) network",
         )
         parser.add_argument(
             "--sens_prompt_dim",
-            default=  [12, 24, 36], # default = [12, 24, 36]
+            default=[12, 24, 36],  # default = [12, 24, 36]
             nargs="+",
             type=int,
             help="prompt dim for each level in PromptUnet in sensitivity map estimation (SME) network",
         )
         parser.add_argument(
             "--len_prompt",
-            default=[5,5,5],
+            default=[5, 5, 5],
             nargs="+",
             type=int,
             help="number of prompt component in each level",
         )
         parser.add_argument(
             "--prompt_size",
-            default=[64, 32, 16], # =[64, 32, 16]
+            default=[64, 32, 16],  # =[64, 32, 16]
             nargs="+",
             type=int,
             help="prompt spatial size",
@@ -556,7 +438,8 @@ class DAGMRNetModule(MriModule):
             "--use_checkpoint", action="store_true", help="Use checkpoint (default: False)"
         )
         parser.add_argument(
-            "--low_mem", action="store_true", help="consume less memory by computing sens_map coil by coil (default: False)"
+            "--low_mem", action="store_true",
+            help="consume less memory by computing sens_map coil by coil (default: False)"
         )
 
         return parser

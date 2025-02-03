@@ -145,36 +145,32 @@ class DynamicAttentionMechanism(nn.Module):
         b1 = self.g(b)
         b2 = self.theta(b)
         b3 = b1
-        
+
         raw_int_bs = list(b1.size())  # b*c*h*w
         b4, _ = same_padding(b,[self.ksize,self.ksize],[self.stride_1,self.stride_1],[1,1])
         soft_thr = self.thr_conv(b4).view(raw_int_bs[0],-1)
         soft_bias = self.bias_conv(b4).view(raw_int_bs[0],-1)
-
-        # extracts patches from b1
         patch_28, paddings_28 = ExtractImagePatches(b1, ksizes=[self.ksize, self.ksize],
-                                                    strides=[self.stride_1, self.stride_1],
-                                                    rates=[1, 1],
-                                                    padding='same')
+                                                      strides=[self.stride_1, self.stride_1],
+                                                      rates=[1, 1],
+                                                      padding='same')
         patch_28 = patch_28.view(raw_int_bs[0], raw_int_bs[1], self.ksize, self.ksize, -1)
         patch_28 = patch_28.permute(0, 4, 1, 2, 3)
         patch_28_group = torch.split(patch_28, 1, dim=0)
 
-        # Similar to patch_28, patches are extracted from b2 but using different stride parameters
         patch_112, paddings_112 = ExtractImagePatches(b2, ksizes=[self.ksize, self.ksize],
-                                                      strides=[self.stride_2, self.stride_2],
-                                                      rates=[1, 1],
-                                                      padding='same')
+                                                        strides=[self.stride_2, self.stride_2],
+                                                        rates=[1, 1],
+                                                        padding='same')
 
         patch_112 = patch_112.view(raw_int_bs[0], raw_int_bs[1], self.ksize, self.ksize, -1)
         patch_112 = patch_112.permute(0, 4, 1, 2, 3)
         patch_112_group = torch.split(patch_112, 1, dim=0)
 
-        # patches are again extracted from b3 using similar settings as for b2
         patch_112_2, paddings_112_2 = ExtractImagePatches(b3, ksizes=[self.ksize, self.ksize],
-                                                          strides=[self.stride_2, self.stride_2],
-                                                          rates=[1, 1],
-                                                          padding='same')
+                                                        strides=[self.stride_2, self.stride_2],
+                                                        rates=[1, 1],
+                                                        padding='same')
 
         patch_112_2 = patch_112_2.view(raw_int_bs[0], raw_int_bs[1], self.ksize, self.ksize, -1)
         patch_112_2 = patch_112_2.permute(0, 4, 1, 2, 3)
@@ -182,6 +178,7 @@ class DynamicAttentionMechanism(nn.Module):
         y = []
         w, h = raw_int_bs[2], raw_int_bs[3]
         _, paddings = same_padding(b3[0,0].unsqueeze(0).unsqueeze(0), [self.ksize, self.ksize], [self.stride_2, self.stride_2], [1, 1])
+        
         for xi, wi,pi,thr,bias in zip(patch_112_group_2, patch_28_group, patch_112_group,soft_thr,soft_bias):
             c_s = pi.shape[2]
             k_s = wi[0].shape[2]
@@ -192,11 +189,14 @@ class DynamicAttentionMechanism(nn.Module):
                                        math.ceil(h / self.stride_2))
             b_s, l_s, h_s, w_s = score_map.shape
             yi = score_map.view(l_s, -1)
+            
             mask = F.relu(yi-yi.mean(dim=1,keepdim=True)*thr.unsqueeze(1)+bias.unsqueeze(1))
             mask_b = (mask!=0.).float()
+
             yi = yi * mask
             yi = F.softmax(yi * self.softmax_scale, dim=1)
             yi = yi * mask_b
+            
             pi = pi.view(h_s * w_s, -1)
             yi = torch.mm(yi, pi)
             yi = yi.view(b_s, l_s, c_s, k_s, k_s)[0]
@@ -205,11 +205,11 @@ class DynamicAttentionMechanism(nn.Module):
             inp = torch.ones_like(zi)
             inp_unf = torch.nn.functional.unfold(inp, (self.ksize, self.ksize), padding=paddings[0], stride=self.stride_1)
             out_mask = torch.nn.functional.fold(inp_unf, (raw_int_bs[2], raw_int_bs[3]), (self.ksize, self.ksize), padding=paddings[0], stride=self.stride_1)
+            out_mask += (out_mask==0.).float()
             zi = zi / out_mask
             y.append(zi)
         y = torch.cat(y, dim=0)
         return y
-
 
 class M_GFAM(nn.Module):
     def __init__(self, in_channels, num=4):
@@ -226,21 +226,18 @@ class M_GFAM(nn.Module):
         self.c1_1 = DynamicAttentionMechanism(in_channels=in_channels)
         self.c1_2 = DynamicAttentionMechanism(in_channels=in_channels)
         self.c1_3 = DynamicAttentionMechanism(in_channels=in_channels)
-        # self.c1_4 = DynamicAttentionMechanism(in_channels=in_channels)
         self.c1_c = nn.Conv2d(in_channels, in_channels, 1, 1, 0)
 
         # stage 2 (3 heads)
         self.c2_1 = DynamicAttentionMechanism(in_channels=in_channels)
         self.c2_2 = DynamicAttentionMechanism(in_channels=in_channels)
         self.c2_3 = DynamicAttentionMechanism(in_channels=in_channels)
-        # self.c2_4 = DynamicAttentionMechanism(in_channels=in_channels)
         self.c2_c = nn.Conv2d(in_channels, in_channels, 1, 1, 0)
 
         # stage 3 (3 heads)
         self.c3_1 = DynamicAttentionMechanism(in_channels=in_channels)
         self.c3_2 = DynamicAttentionMechanism(in_channels=in_channels)
         self.c3_3 = DynamicAttentionMechanism(in_channels=in_channels)
-        # self.c3_4 = DynamicAttentionMechanism(in_channels=in_channels)
         self.c3_c = nn.Conv2d(in_channels, in_channels, 1, 1, 0)
 
     def forward(self, x):

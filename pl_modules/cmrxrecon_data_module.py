@@ -102,7 +102,7 @@ class CmrxReconDataModule(pl.LightningDataModule):
         test_filter: Optional[Callable] = None,
         use_dataset_cache_file: bool = True,
         batch_size: int = 1,
-        num_workers: int = 8,
+        num_workers: int = 4,
         distributed_sampler: bool = False,
     ):
         """
@@ -160,18 +160,12 @@ class CmrxReconDataModule(pl.LightningDataModule):
                 "Can set test_sample_rate or test_volume_sample_rate, but not both."
             )
         # TODO: ugly but working code, mapping data will be loaded in CmrxReconSliceDataset
-        # self.data_path = data_path / 'Cine' / 'TrainingSet' / h5py_folder 
-        # print("data_path:", data_path)
-        # print("'Cine':", 'Cine')
-        # print("'TrainingSet':", 'TrainingSet')
-        # print("h5py_folder:", h5py_folder)
-        self.data_path = data_path.joinpath('Cine', h5py_folder)
-        
+        self.data_path = data_path / 'Cine'  / h5py_folder
         self.challenge = challenge
         self.train_transform = train_transform
         self.val_transform = val_transform
         self.test_transform = test_transform
-        self.combine_train_val = False
+        self.combine_train_val = combine_train_val
         self.test_split = test_split
         self.test_path = test_path
         self.sample_rate = sample_rate
@@ -226,10 +220,9 @@ class CmrxReconDataModule(pl.LightningDataModule):
                     else volume_sample_rate
                 )
                 raw_sample_filter = self.test_filter
-        
+
         # if desired, combine train and val together for the train split
-        # dataset: Union[CmrxReconSliceDataset, CombinedCmrxReconSliceDataset]
-        
+        dataset: Union[CmrxReconSliceDataset, CombinedCmrxReconSliceDataset]
         if is_train and self.combine_train_val:
             data_paths = [
                 self.data_path / "train",
@@ -255,7 +248,7 @@ class CmrxReconDataModule(pl.LightningDataModule):
             if data_partition in ("test", "challenge") and self.test_path is not None:
                 data_path = self.test_path
             else:
-                data_path = self.data_path / data_partition #"val" 
+                data_path = self.data_path / data_partition #"val"
 
             dataset = CmrxReconSliceDataset(
                 root=data_path,
@@ -266,13 +259,6 @@ class CmrxReconDataModule(pl.LightningDataModule):
                 use_dataset_cache=self.use_dataset_cache_file,
                 raw_sample_filter=raw_sample_filter,
             )
-
-         # Debug logs
-        print(f"DataLoader Partition: {data_partition}")
-        if data_partition == "train":
-            print(f"Using train dataset: {self.data_path / 'train'}")
-        elif data_partition == "val":
-            print(f"Using val dataset: {self.data_path / 'val'}")
 
         # ensure that entire volumes go to the same GPU in the ddp setting
         sampler = None
@@ -291,11 +277,10 @@ class CmrxReconDataModule(pl.LightningDataModule):
             sampler=sampler,
             shuffle=is_train if sampler is None else False,
         )
-        print(f"DataLoader Partition: {data_partition}")
-        print(f"Data Path: {data_path}")
+
         return dataloader
 
-    
+
     def prepare_data(self):
         # call dataset for each split one time to make sure the cache is set up on the
         # rank 0 ddp process. if not using cache, don't do this
@@ -330,11 +315,9 @@ class CmrxReconDataModule(pl.LightningDataModule):
                 )
 
     def train_dataloader(self):
-        print("Creating train dataloader...")
         return self._create_data_loader(self.train_transform, data_partition="train")
 
     def val_dataloader(self):
-        print("Creating val dataloader...")
         return self._create_data_loader(self.val_transform, data_partition="val")
 
     def test_dataloader(self):
@@ -444,7 +427,6 @@ class CmrxReconDataModule(pl.LightningDataModule):
         )
         parser.add_argument(
             "--combine_train_val",
-            # default=False,
             action="store_true",
             help="Whether to combine train and val splits for training",
         )
@@ -455,7 +437,7 @@ class CmrxReconDataModule(pl.LightningDataModule):
         )
         parser.add_argument(
             "--num_workers",
-            default=8,
+            default=4,
             type=int,
             help="Number of workers to use in data loader",
         )

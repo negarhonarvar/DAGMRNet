@@ -24,10 +24,16 @@ import requests
 import torch
 import yaml
 
+
+def default_filter(raw_sample):
+    return True
+
+
 class CMRxReconRawDataSample(NamedTuple):
     fname: Path
     slice_ind: int
     metadata: Dict[str, Any]
+
 
 class CombinedCmrxReconSliceDataset(torch.utils.data.Dataset):
     """
@@ -35,16 +41,16 @@ class CombinedCmrxReconSliceDataset(torch.utils.data.Dataset):
     """
 
     def __init__(
-        self,
-        roots: Sequence[Path],
-        challenges: Sequence[str],
-        transforms: Optional[Sequence[Optional[Callable]]] = None,
-        sample_rates: Optional[Sequence[Optional[float]]] = None,
-        volume_sample_rates: Optional[Sequence[Optional[float]]] = None,
-        use_dataset_cache: bool = False,
-        dataset_cache_file: Union[str, Path, os.PathLike] = "dataset_cache.pkl",
-        num_cols: Optional[Tuple[int]] = None,
-        raw_sample_filter: Optional[Callable] = None,
+            self,
+            roots: Sequence[Path],
+            challenges: Sequence[str],
+            transforms: Optional[Sequence[Optional[Callable]]] = None,
+            sample_rates: Optional[Sequence[Optional[float]]] = None,
+            volume_sample_rates: Optional[Sequence[Optional[float]]] = None,
+            use_dataset_cache: bool = False,
+            dataset_cache_file: Union[str, Path, os.PathLike] = "dataset_cache.pkl",
+            num_cols: Optional[Tuple[int]] = None,
+            raw_sample_filter: Optional[Callable] = None,
     ):
         """
         Args:
@@ -87,11 +93,11 @@ class CombinedCmrxReconSliceDataset(torch.utils.data.Dataset):
         if volume_sample_rates is None:
             volume_sample_rates = [None] * len(roots)
         if not (
-            len(roots)
-            == len(transforms)
-            == len(challenges)
-            == len(sample_rates)
-            == len(volume_sample_rates)
+                len(roots)
+                == len(transforms)
+                == len(challenges)
+                == len(sample_rates)
+                == len(volume_sample_rates)
         ):
             raise ValueError(
                 "Lengths of roots, transforms, challenges, sample_rates do not match"
@@ -126,19 +132,20 @@ class CombinedCmrxReconSliceDataset(torch.utils.data.Dataset):
             else:
                 i = i - len(dataset)
 
+
 class CmrxReconSliceDataset(torch.utils.data.Dataset):
     def __init__(
-        self,
-        root: Union[str, Path, os.PathLike],
-        challenge: str,
-        transform: Optional[Callable] = None,
-        use_dataset_cache: bool = False,
-        sample_rate: Optional[float] = None,
-        volume_sample_rate: Optional[float] = None,
-        dataset_cache_file: Union[str, Path, os.PathLike] = "dataset_cache.pkl",
-        num_cols: Optional[Tuple[int]] = None,
-        raw_sample_filter: Optional[Callable] = None,
-        num_adj_slices = 1 #15
+            self,
+            root: Union[str, Path, os.PathLike],
+            challenge: str,
+            transform: Optional[Callable] = None,
+            use_dataset_cache: bool = False,
+            sample_rate: Optional[float] = None,
+            volume_sample_rate: Optional[float] = None,
+            dataset_cache_file: Union[str, Path, os.PathLike] = "dataset_cache.pkl",
+            num_cols: Optional[Tuple[int]] = None,
+            raw_sample_filter: Optional[Callable] = None,
+            num_adj_slices=1  # 15
     ):
         """
         Args:
@@ -179,21 +186,17 @@ class CmrxReconSliceDataset(torch.utils.data.Dataset):
 
         self.transform = transform
 
-        assert num_adj_slices % 2 == 1, "Number of adjacent slices must be odd in SliceDataset" 
+        assert num_adj_slices % 2 == 1, "Number of adjacent slices must be odd in SliceDataset"
         self.num_adj_slices = num_adj_slices
 
         self.recons_key = (
             "reconstruction_esc" if challenge == "singlecoil" else "reconstruction_rss"
         )
-
         self.raw_samples = []
-        self.raw_sample_filter = bool if raw_sample_filter is None else raw_sample_filter
-        
-        # self.raw_samples = []
-        # if raw_sample_filter is None:
-        #     self.raw_sample_filter = lambda raw_sample: True
-        # else:
-        #     self.raw_sample_filter = raw_sample_filter
+        if raw_sample_filter is None:
+            self.raw_sample_filter = default_filter
+        else:
+            self.raw_sample_filter = raw_sample_filter
 
         # set default sampling mode if none given
         if sample_rate is None:
@@ -202,7 +205,7 @@ class CmrxReconSliceDataset(torch.utils.data.Dataset):
             volume_sample_rate = 1.0
 
         # load dataset cache if we have and user wants to use it
-        if self.dataset_cache_file.exists() and use_dataset_cache:
+        if self.dataset_cache_file.exists() and False:
             with open(self.dataset_cache_file, "rb") as f:
                 dataset_cache = pickle.load(f)
         else:
@@ -211,41 +214,21 @@ class CmrxReconSliceDataset(torch.utils.data.Dataset):
         # check if our dataset is in the cache
         # if there, use that metadata, if not, then regenerate the metadata
         if dataset_cache.get(root) is None or not use_dataset_cache:
-
-            print(f"Root is: {Path(root)}")
-
-            # Cine - LAX - SAX
             folders = list(Path(root).iterdir())
             files = []
             for i in range(len(folders)):
                 files += list(folders[i].iterdir())
-
-            # # # Mapping = T1 - T2 
-            # folders = list(Path(str(root).replace('Cine','Mapping')).iterdir())
+            # include mapping data
+            # folders = list(Path(str(root)).iterdir())
             # files2 = []
             # for i in range(len(folders)):
-            #      files2 += list(folders[i].iterdir())
-
-            # # Aorta = SAG - TRA 
-            # folders = list(Path(str(root).replace('Cine','Aorta')).iterdir())
-            # files3 = []
-            # for i in range(len(folders)):
-            #     files3 += list(folders[i].iterdir())
-
-            # # Tagging = Tagging
-            # folders = list(Path(str(root).replace('Cine','Tagging')).iterdir())
-            # files4 = []
-            # for i in range(len(folders)):
-            #     files4 += list(folders[i].iterdir())
-
-
-            # files = sorted(files+files2+files3+files4)
+            #     files2 += list(folders[i].iterdir())
             files = sorted(files)
 
-            for fname in sorted(files): 
-                with h5py.File(fname,'r') as hf:
+            for fname in sorted(files):
+                with h5py.File(fname, 'r') as hf:
                     num_slices = hf["kspace"].shape[0]
-                    metadata = { **hf.attrs }
+                    metadata = {**hf.attrs}
                 new_raw_samples = []
                 for slice_ind in range(num_slices):
                     raw_sample = CMRxReconRawDataSample(fname, slice_ind, metadata)
@@ -262,94 +245,41 @@ class CmrxReconSliceDataset(torch.utils.data.Dataset):
             logging.info(f"Using dataset cache from {self.dataset_cache_file}.")
             self.raw_samples = dataset_cache[root]
 
-        # balance the different type of training data 
+        # balance the different type of training data
         if 'train' in str(root):
-
             raw_samples_t1 = []
             raw_samples_t2 = []
-
             raw_samples_lax = []
             raw_samples_sax = []
-            raw_samples_lvot = []
-
-            raw_samples_aorta_sag = []
-            raw_samples_aorta_tra = []
-
-            raw_samples_tagging = []
-
             for ii in self.raw_samples:
                 fname_ii = str(ii.fname)
                 if 'T1' in fname_ii:
                     raw_samples_t1.append(ii)
-                elif 'T2' in fname_ii:
+                elif 'lvot' in fname_ii:
                     raw_samples_t2.append(ii)
                 elif 'lax' in fname_ii:
                     raw_samples_lax.append(ii)
                 elif 'sax' in fname_ii:
                     raw_samples_sax.append(ii)
-                elif 'lvot' in fname_ii:
-                    raw_samples_lvot.append(ii)               
-                elif 'aorta_sag' in fname_ii:
-                    raw_samples_aorta_sag.append(ii)
-                elif 'aorta_tra' in fname_ii:
-                    raw_samples_aorta_tra.append(ii)
-                elif 'tagging' in fname_ii:
-                    raw_samples_tagging.append(ii)
-        
-            # print(f"T1 :{len(raw_samples_t1)}")
-            # print(f"T2 :{len(raw_samples_t2)}")
-            print(f"LAX :{len(raw_samples_lax)}")
-            print(f"SAX :{len(raw_samples_sax)}")
-            print(f"LVOT :{len(raw_samples_lvot)}")
-            # print(f"AORTA_SAG :{len(raw_samples_aorta_sag)}")
-            # print(f"AORTA_TRA :{len(raw_samples_aorta_tra)}")
-            # print(f"TAGGING :{len(raw_samples_tagging)}")
-
-            # T1 :8712
-            # T2 :2904
-            # LAX :6372
-            # SAX :19884
-            # LVOT :2100
-            # AORTA_SAG :12720
-            # AORTA_TRA :12888
-            # TAGGING :16728
-            # Dataset size :82308
-
-            # self.raw_samples = (
-            # raw_samples_aorta_sag * 1
-            # + raw_samples_aorta_tra * 1
-            # + raw_samples_tagging * 1
-            # + raw_samples_lvot * 9
-            # + raw_samples_sax * 1
-            # + raw_samples_lax * 3
-            # + raw_samples_t1 * 2
-            # + raw_samples_t2 * 7
-            #                    )
-            # print(f"Dataset size :{len(self.raw_samples)}")
-
-            self.raw_samples = (
-            raw_samples_lvot 
-            + raw_samples_sax 
-            + raw_samples_lax
-                               )
-            print(f"Dataset size :{len(self.raw_samples)}")
+            self.raw_samples = raw_samples_t2 * 9 + raw_samples_lax * 3 + raw_samples_sax
+            print("Dataset size : ", len(self.raw_samples))
         # self.raw_samples = self.raw_samples[0:1000]  # for quick debug
 
         # subsample if desired
-        if sample_rate < 1.0:  # sample by slice
-            random.shuffle(self.raw_samples)
-            num_raw_samples = round(len(self.raw_samples) * sample_rate)
-            self.raw_samples = self.raw_samples[:num_raw_samples]
-        elif volume_sample_rate < 1.0:  # sample by volume
-            vol_names = sorted(list(set([f[0].stem for f in self.raw_samples])))
-            random.shuffle(vol_names)
-            num_volumes = round(len(vol_names) * volume_sample_rate)
-            sampled_vols = vol_names[:num_volumes]
-            self.raw_samples = [
-                raw_sample
-                for raw_sample in self.raw_samples
-                if raw_sample[0].stem in sampled_vols
-            ]
+        # if sample_rate < 1.0:  # sample by slice
+        #     random.shuffle(self.raw_samples)
+        #     num_raw_samples = round(len(self.raw_samples) * sample_rate)
+        #     self.raw_samples = self.raw_samples[:num_raw_samples]
+        # elif volume_sample_rate < 1.0:  # sample by volume
+        #     vol_names = sorted(list(set([f[0].stem for f in self.raw_samples])))
+        #     random.shuffle(vol_names)
+        #     num_volumes = round(len(vol_names) * volume_sample_rate)
+        #     sampled_vols = vol_names[:num_volumes]
+        #     self.raw_samples = [
+        #         raw_sample
+        #         for raw_sample in self.raw_samples
+        #         if raw_sample[0].stem in sampled_vols
+        #     ]
 
         if num_cols:
             self.raw_samples = [
@@ -357,60 +287,61 @@ class CmrxReconSliceDataset(torch.utils.data.Dataset):
                 for ex in self.raw_samples
                 if ex[2]["encoding_size"][1] in num_cols  # type: ignore
             ]
-    
+
     def _get_frames_indices(self, dataslice, num_slices_in_volume, num_t_in_volume=None, is_lax=False):
         '''
         when we reshape t, z to one axis in preprocessing, we need to get the indices of the slices in the original t, z axis;
         then find the adjacent slices in the original z axis
         '''
-        ti = dataslice//num_slices_in_volume
-        zi = dataslice - ti*num_slices_in_volume
+        ti = dataslice // num_slices_in_volume
+        zi = dataslice - ti * num_slices_in_volume
 
         zi_idx_list = [zi]
 
-        ti_idx_list = [ (i+ti)%num_t_in_volume for i in range(-2,3)]
+        ti_idx_list = [(i + ti) % num_t_in_volume for i in range(-2, 3)]
         output_list = []
 
         for zz in zi_idx_list:
             for tt in ti_idx_list:
-                output_list.append(tt*num_slices_in_volume + zz)
+                output_list.append(tt * num_slices_in_volume + zz)
 
         return output_list
+
     def _get_frames_indices_mapping(self, dataslice, num_slices_in_volume, num_t_in_volume=None, isT2=False):
         '''
         when we reshape t, z to one axis in preprocessing, we need to get the indices of the slices in the original t, z axis;
         then find the adjacent slices in the original z axis
         '''
-        ti = dataslice//num_slices_in_volume
-        zi = dataslice - ti*num_slices_in_volume
+        ti = dataslice // num_slices_in_volume
+        zi = dataslice - ti * num_slices_in_volume
 
         zi_idx_list = [zi]
 
-        if isT2: # only 3 nw in T2, so we repeat adjacent for 3 times
-            ti_idx_list = [ (i+ti)%num_t_in_volume for i in range(-1,2)]
-            ti_idx_list = 1*ti_idx_list[0:1] + ti_idx_list + ti_idx_list[2:3]*1
+        if isT2:  # only 3 nw in T2, so we repeat adjacent for 3 times
+            ti_idx_list = [(i + ti) % num_t_in_volume for i in range(-1, 2)]
+            ti_idx_list = 1 * ti_idx_list[0:1] + ti_idx_list + ti_idx_list[2:3] * 1
         else:
-            ti_idx_list = [ (i+ti)%num_t_in_volume for i in range(-2,3)]
+            ti_idx_list = [(i + ti) % num_t_in_volume for i in range(-2, 3)]
         output_list = []
 
         for zz in zi_idx_list:
             for tt in ti_idx_list:
-                output_list.append(tt*num_slices_in_volume + zz)
+                output_list.append(tt * num_slices_in_volume + zz)
 
         return output_list
 
     def __len__(self):
         return len(self.raw_samples)
-    
+
     def __getitem__(self, i: int):
         fname, dataslice, metadata = self.raw_samples[i]
-        
-        #TODO: use metadata to decide rather than fname is better
-        islax=False if 'sax' in fname.name else True
-        isT2=True if 'T2' in fname.name else False
+
+        # #TODO: use metadata to decide rather than fname is better
+        islax = False if 'sax' in fname.name else True
+        isT2 = True if 'T2' in fname.name else False
 
         kspace = []
-        with h5py.File(str(fname),'r') as hf:
+        with h5py.File(str(fname), 'r') as hf:
             kspace_volume = hf["kspace"]
             mask = np.asarray(hf["mask"]) if "mask" in hf else None
             target = hf[self.recons_key][dataslice] if self.recons_key in hf else None
@@ -418,25 +349,18 @@ class CmrxReconSliceDataset(torch.utils.data.Dataset):
 
             num_slices = attrs['shape'][1]
             num_t = attrs['shape'][0]
-            # print(f"slices: {num_slices}, times:{num_t}")
-
-            if 'Cine' or 'aorta' or 'tagging' in str(fname):
-                slice_idx_list = self._get_frames_indices(dataslice, num_slices,num_t, is_lax=islax) 
+            if 'Cine' in str(fname):
+                slice_idx_list = self._get_frames_indices(dataslice, num_slices, num_t, is_lax=islax)
             else:
-                slice_idx_list = self._get_frames_indices_mapping(dataslice, num_slices,num_t,isT2=isT2)  
-            
-
+                slice_idx_list = self._get_frames_indices_mapping(dataslice, num_slices, num_t, isT2=isT2)
             for idx in slice_idx_list:
                 kspace.append(kspace_volume[idx])
             kspace = np.concatenate(kspace, axis=0)
-            # print(kspace.shape)
 
         if self.transform is None:
             sample = (kspace, mask, target, attrs, str(fname), dataslice)
         else:
             sample = self.transform(kspace, mask, target, attrs, str(fname), dataslice)
-            # print(f"kspace shape: {kspace.shape}")
-            # print(f"kspace shape: {target.shape}")
 
         return sample
 
@@ -446,9 +370,9 @@ class CmrxReconSliceDataset(torch.utils.data.Dataset):
 #########################################################################################################
 
 def et_query(
-    root: etree.Element,
-    qlist: Sequence[str],
-    namespace: str = "http://www.ismrm.org/ISMRMRD",
+        root: etree.Element,
+        qlist: Sequence[str],
+        namespace: str = "http://www.ismrm.org/ISMRMRD",
 ) -> str:
     """
     ElementTree query function.
@@ -479,10 +403,12 @@ def et_query(
 
     return str(value.text)
 
+
 class FastmriKneeRawDataSample(NamedTuple):
     fname: Path
     slice_ind: int
     metadata: Dict[str, Any]
+
 
 class CombinedFastmriKneeSliceDataset(torch.utils.data.Dataset):
     """
@@ -490,16 +416,16 @@ class CombinedFastmriKneeSliceDataset(torch.utils.data.Dataset):
     """
 
     def __init__(
-        self,
-        roots: Sequence[Path],
-        challenges: Sequence[str],
-        transforms: Optional[Sequence[Optional[Callable]]] = None,
-        sample_rates: Optional[Sequence[Optional[float]]] = None,
-        volume_sample_rates: Optional[Sequence[Optional[float]]] = None,
-        use_dataset_cache: bool = False,
-        dataset_cache_file: Union[str, Path, os.PathLike] = "dataset_cache.pkl",
-        num_cols: Optional[Tuple[int]] = None,
-        raw_sample_filter: Optional[Callable] = None,
+            self,
+            roots: Sequence[Path],
+            challenges: Sequence[str],
+            transforms: Optional[Sequence[Optional[Callable]]] = None,
+            sample_rates: Optional[Sequence[Optional[float]]] = None,
+            volume_sample_rates: Optional[Sequence[Optional[float]]] = None,
+            use_dataset_cache: bool = False,
+            dataset_cache_file: Union[str, Path, os.PathLike] = "dataset_cache.pkl",
+            num_cols: Optional[Tuple[int]] = None,
+            raw_sample_filter: Optional[Callable] = None,
     ):
         """
         Args:
@@ -542,11 +468,11 @@ class CombinedFastmriKneeSliceDataset(torch.utils.data.Dataset):
         if volume_sample_rates is None:
             volume_sample_rates = [None] * len(roots)
         if not (
-            len(roots)
-            == len(transforms)
-            == len(challenges)
-            == len(sample_rates)
-            == len(volume_sample_rates)
+                len(roots)
+                == len(transforms)
+                == len(challenges)
+                == len(sample_rates)
+                == len(volume_sample_rates)
         ):
             raise ValueError(
                 "Lengths of roots, transforms, challenges, sample_rates do not match"
@@ -581,22 +507,23 @@ class CombinedFastmriKneeSliceDataset(torch.utils.data.Dataset):
             else:
                 i = i - len(dataset)
 
+
 class FastmriKneeSliceDataset(torch.utils.data.Dataset):
     """
     A PyTorch Dataset that provides access to MR image slices.
     """
 
     def __init__(
-        self,
-        root: Union[str, Path, os.PathLike],
-        challenge: str,
-        transform: Optional[Callable] = None,
-        use_dataset_cache: bool = False,
-        sample_rate: Optional[float] = None,
-        volume_sample_rate: Optional[float] = None,
-        dataset_cache_file: Union[str, Path, os.PathLike] = "dataset_cache.pkl",
-        num_cols: Optional[Tuple[int]] = None,
-        raw_sample_filter: Optional[Callable] = None,
+            self,
+            root: Union[str, Path, os.PathLike],
+            challenge: str,
+            transform: Optional[Callable] = None,
+            use_dataset_cache: bool = False,
+            sample_rate: Optional[float] = None,
+            volume_sample_rate: Optional[float] = None,
+            dataset_cache_file: Union[str, Path, os.PathLike] = "dataset_cache.pkl",
+            num_cols: Optional[Tuple[int]] = None,
+            raw_sample_filter: Optional[Callable] = None,
     ):
         """
         Args:
@@ -743,14 +670,14 @@ class FastmriKneeSliceDataset(torch.utils.data.Dataset):
 
     def __len__(self):
         return len(self.raw_samples)
-    
-    def _get_frames_indices(self,dataslice, num_slices):
-        z_list = [ min(max(i+dataslice,0), num_slices-1) for i in range(-1,2)]
+
+    def _get_frames_indices(self, dataslice, num_slices):
+        z_list = [min(max(i + dataslice, 0), num_slices - 1) for i in range(-1, 2)]
         return z_list
 
     def __getitem__(self, i: int):
         fname, dataslice, metadata = self.raw_samples[i]
-        
+
         kspace = []
         with h5py.File(fname, "r") as hf:
             num_slices = hf["kspace"].shape[0]
@@ -758,7 +685,6 @@ class FastmriKneeSliceDataset(torch.utils.data.Dataset):
             for slice_idx in slice_idx_list:
                 kspace.append(hf["kspace"][slice_idx])
             kspace = np.concatenate(kspace, axis=0)
-
 
             mask = np.asarray(hf["mask"]) if "mask" in hf else None
 
