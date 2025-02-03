@@ -26,7 +26,7 @@ This model is trained on Training Set of Multi Coil Cine accelerated cardiac MRI
 
 ## Results :bar_chart:
 
-## Table 3-4: Training Results of the Proposed Model and PromptMR for LVOT, LAX, and SAX
+#### Table: Training Results of the Proposed Model and PromptMR for LVOT, LAX, and SAX
 
 | Model       | PSNR/SSIM          | Number of Fully Sampled Signals | Acceleration Factor | Number of Variables | Number of Cascades |
 |------------|--------------------|---------------------------------|---------------------|----------------------|--------------------|
