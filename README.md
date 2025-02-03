@@ -22,6 +22,15 @@ Required libraries and dependencies are listed as a code block inside the requir
 This model is trained on Training Set of Multi Coil Cine accelerated cardiac MRI's of CMRxRecon Dataset and evaluated on its Validation Set datas, which are intended for CMR reconstruction evaluation. Check the [Link](https://cmrxrecon.github.io/2024/Home.html)
  and request for the dataset.
 
+## Results :bar_chart:
+
+## Table 3-4: Training Results of the Proposed Model and PromptMR for LVOT, LAX, and SAX
+
+| Model       | PSNR/SSIM          | Number of Fully Sampled Signals | Acceleration Factor | Number of Variables | Number of Cascades |
+|------------|--------------------|---------------------------------|---------------------|----------------------|--------------------|
+| **PromptMR** | 38.28 / 0.9560      | 16                              | 4x, 8x, 10×                 | 90 M               | 12                 |
+| **Proposed Model** | 37.10 / 0.9510  | 16                              | 4x, 8x, 10×              | 16.1 M               | 4                  |
+
 
 ## Training/Inference Codes & Pretrained models :brain:
 
