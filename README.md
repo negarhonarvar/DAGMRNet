@@ -1,4 +1,4 @@
-# DAGMRNet: Dynamic Attentive Graph Learning Cardiac MR Image Reconstruction 
+# DAGMRNet: Dynamic Attentive Graph Learning for Cardiac MR Image Reconstruction 
 
 This repository contains the pytorch implementation of DAGMRNet, a comprehensive model to reconstruct multi coil cardiac MRI in k-space from CMRxRecon 2024 dataset. 
 
