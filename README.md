@@ -41,5 +41,5 @@ Set the variable
 
     args.mode == "test"
     
-and enjoy reconstruction your CMR images!
+and enjoy reconstruction of your CMR images!
 
